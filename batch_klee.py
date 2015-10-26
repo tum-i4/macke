@@ -4,7 +4,7 @@ import os
 import glob
 from optparse import OptionParser, OptionGroup
 import re
-from source_coverage import source_coverage
+from source_coverage import source_coverage, project_coverage
 from compose_units import get_top_level_funcs, get_outlier_funcs
 from read_ktest import generate_assert_code, get_location_to_insert, modify_unit_files, get_lines_to_insert
 from second_klee_round import get_target_info
@@ -99,18 +99,20 @@ if __name__=='__main__':
                 #    continue
                 
 
-                os.system(klee_command + '--output-dir=' + ud + main_name + '_' + func_name + '/ ' + dir_name+main_name + ' ' + klee_sym_args)
+                os.system(klee_command + '--output-dir=' + ud + main_name + '_' + func_name + '/ ' + dir_name + exec_name + ' ' + klee_sym_args)
             os.system('mv ' + dir_name + main_name + '.c.bkp ' + dir_name + main_name + '.c')
 
     uncompiled_files.close()
 
     tot_cov = 0
     tot_seen = 0
+    tot_cov, tot_seen = project_coverage(dir_name)
+    '''
     for c_filename in glob.glob(dir_name + '*.c'):
-        cov, seen = source_coverage(c_filename)
+        cov, seen = project_coverage(c_filename)
         tot_cov += len(cov)
         tot_seen += len(seen)
-
+    '''
     coverage = float(tot_cov)/tot_seen
     src_cov_file = open(dir_name + 'src.cov', 'w+')
     src_cov_file.write(str(coverage))
@@ -138,6 +140,7 @@ if __name__=='__main__':
             unaffected_funcs.extend(unaffected_parent_funcs)
     sorted_unaffected_funcs = []
     for uf in unaffected_funcs:
+        print uf
         if uf not in sorted_unaffected_funcs:
             sorted_unaffected_funcs.append(uf)
     unaffected_funcs = sorted_unaffected_funcs

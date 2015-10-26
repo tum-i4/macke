@@ -81,8 +81,17 @@ if __name__=='__main__':
             time.sleep(3)
             continue
 
+        # Check if the output directory exists
+        if os.path.exists(dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/'):
+            out_i = 1
+            while os.path.exists(dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted_' + str(out_i) + '/'):
+                out_i += 1
+             
+            out_dir = dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted_' + str(i) + '/'
+        else:
+            out_dir = dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/'
         # Run KLEE with --targeted-search
-        os.system(klee_command + '--output-dir=' + dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/ ' + dir_name+main_name + ' ' + klee_sym_args)
+        os.system(klee_command + '--output-dir=' + out_dir + ' ' + dir_name+exec_name + ' ' + klee_sym_args)
         
         # Replace main file again
         os.system('mv %s%s.c.bkp %s%s.c'%(dir_name, main_name, dir_name, main_name))
