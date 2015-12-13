@@ -8,7 +8,7 @@
 
 #graph {
       background-color: #FFF;
-      height: 70vh;
+      height: 3000px;
 }
 
 #graphContainer {
@@ -56,4 +56,54 @@
 .options {
     width:50%;
     margin-bottom: 20px;
+}
+
+.small-width-number{
+    width: 60px !important;
+}
+
+.formula {
+    font-size: 16px;
+    font-style: italic;
+}
+
+.test-description {
+    font-size: 16px;
+}
+
+.test-link{
+    font-size: 16px;
+}
+
+.test-link:hover{
+    -webkit-transition: all 500ms ease;
+    transition: all 500ms ease;
+    color: blue;
+    font-size: 16px;
+    text-decoration: none;
+}
+
+.break-long-word{
+   white-space: pre-wrap;      /* CSS3 */   
+   white-space: -moz-pre-wrap; /* Firefox */    
+   white-space: -pre-wrap;     /* Opera <7 */   
+   white-space: -o-pre-wrap;   /* Opera 7 */    
+   word-wrap: break-word;      /* IE */
+}
+
+.data-content{
+    margin-left:20px;
+}
+
+.case-info-heading {
+    font-size: 18px; 
+}
+
+.sub-heading-italics {
+    font-style: italic;
+}
+
+.object-info {
+  margin-left: 20px;
+  margin-top: 10px;
 }
