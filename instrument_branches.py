@@ -1,6 +1,6 @@
 from clang.cindex import Index, CursorKind
 from pprint import pprint
-import os, glob
+import os, glob, inspect
 
 from optparse import OptionParser
 import clang.cindex
@@ -37,7 +37,10 @@ def get_compound_line(line_n):
 
 def add_instrumentation():
     global conditionals
-
+    self_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+    if not self_path.endswith('/'):
+        self_path += '/'
+    
     for c in conditionals:
         if c.kind==CursorKind.DO_STMT:
             continue
@@ -50,10 +53,13 @@ def add_instrumentation():
                 mod_lines[ch.location.line - 1] = get_compound_line(ch.location.line)
 
             cur_line_n = ch.location.line-1
+            # Add instrumentation near the opening brace
             while '{' not in mod_lines[cur_line_n]:
                 cur_line_n += 1
             cur_line = mod_lines[cur_line_n]
-            instrumentation  = 'printf("Going into %s\\n");\n'%(hashlib.sha1(str(ch.location.file)+' '+str(ch.location.line)).hexdigest()) 
+
+            # Let Python script take care of logging
+            instrumentation  = 'system("python %s %s\\n");\n'%(self_path+'log_branch.py', hashlib.sha1(str(ch.location.file)+' '+str(ch.location.line)).hexdigest()) 
             for i, char in enumerate(cur_line):
                 if char=='{':
                     break
@@ -88,6 +94,10 @@ def run(c_src_filename):
     # Add instrumentation for all branching statements
     add_instrumentation()
 
+    # Include stdio, just in case
+    mod_lines = ['#include <stdio.h>\n'] + mod_lines
+
+    # Finally write it to the instrumented replacement file
     mod_file.writelines(mod_lines)
 
     print [c.location.line for c in conditionals]
