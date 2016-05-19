@@ -99,7 +99,7 @@ def get_conditional_statement_info(node):
 
 def proc_member_ref_expr(node):
     datatype = node.type.spelling
-    mem = node.spelling
+    mem = node.displayname
     unexposed_expr = [c for c in node.get_children()][0]
     parent_struct = [c for c in unexposed_expr.get_children()][0]
     struct_name = parent_struct.spelling
@@ -157,8 +157,8 @@ def lookup_unexposed_exprs(node):
 def lookup_decl_ref_exprs(node):
     exprs = []
     if node.kind==CursorKind.DECL_REF_EXPR:
-        expr = Expr(node.location, node.spelling, node.type.spelling)
-        exprs = [expr]
+        expr = Expr(node.location, node.displayname, node.type.spelling)
+	exprs = [expr]
     else:
         ch = [c for c in node.get_children()]
         for c in ch:
@@ -282,7 +282,7 @@ def get_call_table(node, iden):
 
 def find_func_node(node, func_name):
     if node.kind==CursorKind.FUNCTION_DECL and node.spelling==func_name and str(node.location.file).endswith('.c'):
-        return node
+	return node
     else:
         ch = [c for c in node.get_children()]
         if ch==[]:
