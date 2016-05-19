@@ -12,23 +12,19 @@ SEVERITY_RANGES = {(0, 1): 0,
         (20, 40): 3, 
         (40, 10000): 4}
 
-LONG_CHAIN = 2
+LONG_CHAIN = 5
 KNOWN_INTERFACE = 4
 PROXIMITY_TO_MAIN = 3
-TOTAL_ERRORS = 5
+TOTAL_ERRORS = 3
 HIGH_OCCURENCE = 4
 ERROR_EXISTS = 3
-HTML_SRC = 'html1/'
+HTML_SRC = 'html4/'
 
-known_interfaces = ['main', 'main_aux']
+known_interfaces = ['bzip2Main', 'bzip2recoverMain']
 nodes = []
 pydot_nodes = {}
-json_nodes = {}
 edges = {}
 pydot_edges = {}
-json_nodes = {}
-node_label_n = {}
-edge_label_n = {}
 
 not_leaf = []
 
@@ -148,35 +144,13 @@ def create_pydot_nodes():
         re_match = re.search(pattern, f)
         colors[re_match.group(3)], tooltips[re_match.group(3)], urls[re_match.group(3)] = get_node_decoration(re_match.group(1), re_match.group(3).split('_')[-1])
     
-    for i, n in enumerate(nodes):
+    for n in nodes:
         if urls[n]!='':
             pydot_nodes[n] = pydot.Node(n, style='filled', fillcolor=colors[n], tooltip=tooltips[n], URL=urls[n])
         else:
             pydot_nodes[n] = pydot.Node(n, style='filled', fillcolor=colors[n], tooltip=tooltips[n])
-        temp_dict = {}
-        temp_dict['id'] = i
-        temp_dict['label'] = n
-        temp_dict['severity'] = tooltips[n]
-        json_nodes.append(temp_dict)
-        node_label_n[n] = i
 
 def create_pydot_edges():
-    for n in edges.keys():
-        node_ends = edges[n]
-
-        for e in node_ends:
-            if e not in nodes:
-                continue
-            if n=='main':
-                print e
-            pydot_edges[(pydot_nodes[n], pydot_nodes[e])] = pydot.Edge(pydot_nodes[n], pydot_nodes[e])
-            temp_dict = {}
-            temp_dict['from'] = node_label_n[n]
-            temp_dict['to'] = node_label_n[e]
-            temp_dict['arrows'] = 'to'
-            json_edges.append(temp_dict)
-
-def create_json_edges():
     for n in edges.keys():
         node_ends = edges[n]
 
@@ -213,12 +187,6 @@ if __name__=='__main__':
     pydot_nodes = {}
     pydot_edges = {}
 
-    json_nodes = []
-    json_edges = []
-
-    node_label_n = {}
-    edge_label_n = {}
-
     parser = OptionParser("usage: %prog -d {directory containing source files}")
     parser.add_option('-d', '--dir', action='store', type='string', dest='dir', help='Source file directory path')
     parser.add_option('-m', '--main', action='store', type='string', dest='main_file', help='Source file containing main function')
@@ -236,7 +204,7 @@ if __name__=='__main__':
         print 'There does not seem to be a directory with that name: ' + dir_name
         sys.exit(-1)
 
-    # temp_hack(dir_name, main_file, main_file_bkp)
+    temp_hack(dir_name, main_file, main_file_bkp)
     
     read_composition_file()
     graph = pydot.Dot(graph_type='digraph', splines='ortho')
@@ -258,22 +226,4 @@ if __name__=='__main__':
     if not os.path.isdir(dir_name + HTML_SRC):
         os.system(dir_name + HTML_SRC)
 
-    #graph.write_svg(dir_name + HTML_SRC + 'call_graph.svg')
-
-    print "var nodesJSON = "
-    print json_nodes
-    print "var edgesJSON = "
-    print json_edges
-
-    sev_1, sev_2, sev_3, sev_4 = 0, 0, 0, 0
-    for node in json_nodes:
-        if node['severity']<=10:
-            sev_1 += 1
-        elif node['severity']>10 and node['severity']<=20:
-            sev_2 += 1
-        elif node['severity']>11 and node['severity']<=40:
-            sev_3 += 1
-        elif node['severity']>40:
-            sev_4 += 1
-
-    print sev_1, sev_2, sev_3, sev_4
+    graph.write_svg(dir_name + HTML_SRC + 'call_graph.svg')

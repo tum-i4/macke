@@ -6,7 +6,7 @@ from generate_unit import find_func_node
 def get_callee_list_rec(node, callee_list):
     ch = [c for c in node.get_children()]
     if node.kind==CursorKind.CALL_EXPR and str(node.location.file).endswith('.c'):
-        callee_list.append(node.spelling)
+        callee_list.append(node.displayname)
 
     for c in ch:
         c_callee = get_callee_list_rec(c, [])
