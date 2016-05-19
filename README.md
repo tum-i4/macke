@@ -4,9 +4,21 @@ MACKE - Modular and Compositional Analysis with KLEE Engine
 Author's note
 ---
 
+A short introduction and usage guide for MACKE is available as a [demo on YouTube](https://www.youtube.com/watch?v=icC3jc3mHEU). 
+
 [Email me](mailto:ognawala@in.tum.de) if something is broken. Ditto if you would like to contribute! 
 
 -- [Saahil Ognawala](https://www.i22.in.tum.de/index.php?id=31&L=1)
+
+Pre-requisites for installation
+---
+Following are the *minimum* requirements before installing MACKE. 
+
+- **Python 2.7+ **
+-  **KLEE** - We have prepared a [KLEE installation guide](https://github.com/tum-i22/macke/blob/master/KLEE.md) that includes all the pre-requisites for KLEE, such as LLVM's Clang toolkit, uclibc and a SMT solver. 
+- **Libclang** - MACKE requires Python wrappings for libclang's C/C++ parsing library to work correctly. A nice guide to parsing C++ in Python can be found at [Eli Bendersky's website](http://eli.thegreenplace.net/2011/07/03/parsing-c-in-python-with-clang), that includes some installation details. 
+
+Please note that we installed MACKE and performed all our experiments on Ubuntu 14.04. Some dependencies may differ based on your system
 
 Description of included scripts
 ---
