@@ -72,8 +72,7 @@ if __name__=='__main__':
         
         # Compile
         os.system('make -C '+dir_name+' clean')
-        make_ret = os.system('make -C '+dir_name+' -j8')
-        os.system('chmod +x ' + dir_name+main_name)
+        make_ret = os.system('make -C '+dir_name)
 
         if not make_ret==0:
             print 'Make error with %s_%s.c.units \nContinuing with the next unit file...\n'%(main_name, target_func)
@@ -81,17 +80,8 @@ if __name__=='__main__':
             time.sleep(3)
             continue
 
-        # Check if the output directory exists
-        if os.path.exists(dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/'):
-            out_i = 1
-            while os.path.exists(dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted_' + str(out_i) + '/'):
-                out_i += 1
-             
-            out_dir = dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted_' + str(i) + '/'
-        else:
-            out_dir = dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/'
         # Run KLEE with --targeted-search
-        os.system(klee_command + '--output-dir=' + out_dir + ' ' + dir_name+exec_name + ' ' + klee_sym_args)
+        os.system(klee_command + '--output-dir=' + dir_name + main_name + '_units/' + main_name + '_' + target_func + '_targeted/ ' + dir_name+exec_name + ' ' + klee_sym_args)
         
         # Replace main file again
         os.system('mv %s%s.c.bkp %s%s.c'%(dir_name, main_name, dir_name, main_name))
