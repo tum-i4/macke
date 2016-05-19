@@ -3,7 +3,7 @@ import re
 from optparse import OptionParser, OptionGroup
 import subprocess
 
-HTML_SRC = 'html1'
+HTML_SRC = 'html4'
 
 if __name__=='__main__':
     # parse arguments
@@ -19,26 +19,15 @@ if __name__=='__main__':
     if not os.path.isdir(dir_name + HTML_SRC):
         os.system('mkdir ' + dir_name + HTML_SRC)
 
-    for d in glob.glob(dir_name + '*_units/*_*.c.units'):
-        re_pattern = dir_name + '(.*)_units/(.*)_(.*).c.units'
+    for d in glob.glob(dir_name + '*_units/*/'):
+        re_pattern = dir_name + '(.*)_units/(.*)_(.*)/'
         re_match = re.search(re_pattern, d)
-        re_pattern_actual = dir_name + '(.*)_units/(.*?)_(.*).c.units'
-        re_match_actual = re.search(re_pattern_actual, d)
+        re_pattern_actual = dir_name + '(.*)_units/(.*?)_(.*)/'
+        re_match_actual = re.search(re_pattern, d)
         func_name_actual = re_match_actual.group(3)
         func_name = re_match.group(3)
-        main_name = re_match.group(1)
 
-        ptr_errs = glob.glob(dir_name + main_name + '_units/' + main_name + '_' + func_name + '/*.ptr.err')
-        ptr_errs_actual = glob.glob(dir_name + main_name + '_units/' + main_name + '_' + func_name_actual + '/*.ptr.err')
-        if (len(ptr_errs)<1 and len(ptr_errs_actual)<1) or (not os.path.isdir(dir_name + main_name + '_units/' + main_name + '_' + func_name + '/') and not os.path.isdir(dir_name + main_name + '_units/' + main_name + '_' + func_name_actual + '/')):
-            print 'Generating alternative HTML for ' + func_name
-            parent_test_case = open(dir_name + HTML_SRC + '/' + func_name_actual + '.html', 'w')
-            parent_test_case.write('<html>Nothing found for %s.<p/>Maybe the function does not contain any known vulnerabilities, but it is close enough to a function that does. Consider sanitizing the input to functions being called by %s<p/><br/></html>'%(func_name_actual, func_name_actual))
-            parent_test_case.close()
-            continue
-
-        print 'Generating HTML for ' + func_name_actual
-        parent_test_case = open(dir_name + HTML_SRC + '/' + func_name_actual + '.html', 'w')
+        parent_test_case = open(dir_name + HTML_SRC + '/' + func_name + '.html', 'w')
         parent_test_case.write('<html>Following test case(s) in %s resulted in memory out-of-bounds errors. Click for more details<p/><br/>'%(func_name_actual))
         parent_test_case.close()
 
