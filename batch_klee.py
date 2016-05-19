@@ -4,7 +4,7 @@ import os
 import glob
 from optparse import OptionParser, OptionGroup
 import re
-from source_coverage import source_coverage, project_coverage
+from source_coverage import source_coverage
 from compose_units import get_top_level_funcs, get_outlier_funcs
 from read_ktest import generate_assert_code, get_location_to_insert, modify_unit_files, get_lines_to_insert
 from second_klee_round import get_target_info
@@ -12,7 +12,7 @@ from second_klee_round import get_target_info
 if __name__=='__main__':
     klee_command = 'klee --simplify-sym-indices --write-cov --write-smt2s --output-module --max-memory=1000 --disable-inlining --optimize --use-forked-solver --use-cex-cache --libc=uclibc --posix-runtime --allow-external-sym-calls --only-output-states-covering-new -max-sym-array-size=4096 -max-instruction-time=%d. --max-time=%d. --watchdog --max-memory-inhibit=false --max-static-fork-pct=1 -max-static-solve-pct=1 --max-static-cpfork-pct=1 --switch-type=internal --randomize-fork --search=nurs:covnew --use-batching-search --batch-instructions=10000 '%(10, 120)
     klee_executable = ' ./bzip2 '
-    klee_sym_args = ' --sym-args 0 2 100 --sym-files 1 100'
+    klee_sym_args = ' --sym-args 1 2 100 --sym-files 1 100'
     decl_vars = []
     func_nodes = []
 
@@ -73,17 +73,12 @@ if __name__=='__main__':
                 #main_file = re_match.group(1)
                 func_name = re_match.group(2)
 
-                if os.path.exists(ud+main_name+'_'+func_name+'/'):
-                    print 'KLEE has been run on this file before: ' + main_name+'_'+func_name+'.c.units'
-                    continue
-
                 if not os.path.exists(dir_name+main_name+'.c.bkp'):
                     os.system('cp '+dir_name+main_name+'.c ' + dir_name+main_name+'.c.bkp')
                 os.system('cp '+f+' '+dir_name+main_name+'.c')
                 
                 os.system('make -C '+dir_name+' clean')
-                make_ret = os.system('make -C '+dir_name+' -j8')
-                os.system('chmod +x ' + dir_name+main_name)
+                make_ret = os.system('make -C '+dir_name+'../')
 
                 if not make_ret==0:
                     uncompiled_files.write(f + '\n')
@@ -99,20 +94,18 @@ if __name__=='__main__':
                 #    continue
                 
 
-                os.system(klee_command + '--output-dir=' + ud + main_name + '_' + func_name + '/ ' + dir_name + exec_name + ' ' + klee_sym_args)
+                os.system(klee_command + '--output-dir=' + ud + main_name + '_' + func_name + '/ ' + dir_name+main_name + ' ' + klee_sym_args)
             os.system('mv ' + dir_name + main_name + '.c.bkp ' + dir_name + main_name + '.c')
 
     uncompiled_files.close()
 
     tot_cov = 0
     tot_seen = 0
-    tot_cov, tot_seen = project_coverage(dir_name)
-    '''
     for c_filename in glob.glob(dir_name + '*.c'):
-        cov, seen = project_coverage(c_filename)
+        cov, seen = source_coverage(c_filename)
         tot_cov += len(cov)
         tot_seen += len(seen)
-    '''
+
     coverage = float(tot_cov)/tot_seen
     src_cov_file = open(dir_name + 'src.cov', 'w+')
     src_cov_file.write(str(coverage))
@@ -140,18 +133,16 @@ if __name__=='__main__':
             unaffected_funcs.extend(unaffected_parent_funcs)
     sorted_unaffected_funcs = []
     for uf in unaffected_funcs:
-        print uf
         if uf not in sorted_unaffected_funcs:
             sorted_unaffected_funcs.append(uf)
     unaffected_funcs = sorted_unaffected_funcs
 
-    '''
     outliers = get_outlier_funcs(all_funcs)
     for o in outliers:
         if o not in affected_funcs:
             composition_file.write(o[1]+'\n')
             composition_file.write(str(o)+'\n\n')
-    '''
+
     # Generate target information to use for targeted path search in KLEE
     target_info_file = open(dir_name + 'target.info', 'w+')
     for uf in unaffected_funcs:
@@ -159,7 +150,7 @@ if __name__=='__main__':
         callee_lines = get_lines_to_insert([(uf[1], uf[2])], uf[0])
         if callee_lines:
             callee_line = callee_lines[0][2]
-        target_info_file.write(caller_file + '\n' + str(callee_line+1) + '\n' + uf[2] + '\n\n')
+            target_info_file.write(caller_file + '\n' + str(callee_line+1) + '\n' + uf[2] + '\n\n')
     target_info_file.close()
     
     target_info = get_target_info(dir_name)
