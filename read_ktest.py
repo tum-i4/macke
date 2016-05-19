@@ -163,7 +163,7 @@ def get_func_node(node, func_name):
     return None
 
 def get_function_call(node, call_name):
-    if node.kind==CursorKind.CALL_EXPR and node.spelling==call_name:
+    if node.kind==CursorKind.CALL_EXPR and node.displayname==call_name:
         return node.location.line
     else:
         ch = [c for c in node.get_children()]
