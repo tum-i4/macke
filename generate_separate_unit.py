@@ -254,7 +254,10 @@ def check_line_for_params(node, f):
         p = p.strip('() ')
         if ' ' not in p:
             continue
-        datatype, var = p.split()
+        tokens = p.split()
+	datatype, var = p[-2:]
+	if 'const' in tokens:
+            datatype = 'const' + datatype
         if '*' in var:
             datatype = datatype + '*'
             var = var.strip('* ')
