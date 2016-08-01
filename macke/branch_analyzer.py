@@ -146,7 +146,7 @@ def lookup_unexposed_exprs(node):
             res = Expr(underlying_expr.location, underlying_expr.spelling, underlying_expr.type.spelling)
             exprs.append(res)
         else: # Unknown underlying expression
-            print "Unknown underlying expression too hard for me to solve at line no: " + str(underlying_expr.location.line)
+            print("Unknown underlying expression too hard for me to solve at line no: " + str(underlying_expr.location.line))
         return exprs
     else: # Keep going deeper until expression is found
         ch = [c for c in node.get_children()]
@@ -210,7 +210,7 @@ def inject_symbolic_code(orig_fl_name):
     global sym_table
     expr_i = 0
     if not orig_fl_name.endswith('.c'):
-        print 'Original file does not seem to be a C source file\nExiting...'
+        print('Original file does not seem to be a C source file\nExiting...')
         sys.exit(-1)
     orig_fl = open(orig_fl_name, 'r')
     instr_fl = open(orig_fl_name[:-2]+'_instr.c', 'w')
