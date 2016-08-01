@@ -1,7 +1,7 @@
 from clang.cindex import Index, CursorKind
-from branch_analyzer import analyze
+from .branch_analyzer import analyze
 import sys, os
-from generate_unit import find_func_node
+from .generate_unit import find_func_node
 
 def get_callee_list_rec(node, callee_list):
     ch = [c for c in node.get_children()]
@@ -18,7 +18,7 @@ def get_callee_list_rec(node, callee_list):
 def get_callee_list(node, func_name):
     func_node = find_func_node(node, func_name)
     if not func_node:
-        print 'Function not found'
+        print('Function not found')
         return None
 
     ch = [c for c in func_node.get_children()]
@@ -34,5 +34,5 @@ if __name__=='__main__':
     index = Index.create()
     tu = index.parse(filename)
 
-    print get_callee_list(tu.cursor, func_name)
+    print(get_callee_list(tu.cursor, func_name))
 

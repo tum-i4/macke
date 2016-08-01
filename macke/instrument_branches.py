@@ -72,7 +72,7 @@ def run(c_src_filename):
     index = Index.create()
 
     if not os.path.exists(c_src_filename):
-        print 'Problem opening file: ' + c_src_filename
+        print('Problem opening file: ' + c_src_filename)
         return None
 
     orig_file = open(c_src_filename, 'r')
@@ -85,7 +85,7 @@ def run(c_src_filename):
     
     tu = index.parse(c_src_filename)
     if not tu:
-        print 'Unable to load input'
+        print('Unable to load input')
         return None
 
     # Get list of all if, while and for statements
@@ -100,7 +100,7 @@ def run(c_src_filename):
     # Finally write it to the instrumented replacement file
     mod_file.writelines(mod_lines)
 
-    print [c.location.line for c in conditionals]
+    print([c.location.line for c in conditionals])
 
 if __name__=='__main__':
     global opts

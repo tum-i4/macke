@@ -25,7 +25,7 @@ if __name__=='__main__':
     exec_name = opts.executable
 
     if not os.path.isdir(dir_name):
-        print 'Could not find the specified directory.\nExiting.'
+        print('Could not find the specified directory.\nExiting.')
         sys.exit(-1)
 
     if not dir_name.endswith('/'):

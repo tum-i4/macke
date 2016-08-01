@@ -28,7 +28,7 @@ def str_without_qual(st):
 
 if __name__=='__main__':
     dir_name = sys.argv[1]
-    print 'copying files in ' + dir_name
+    print('copying files in ' + dir_name)
 
     for src in glob.glob(dir_name+'/*.c'):
         fl = open(src, 'r')

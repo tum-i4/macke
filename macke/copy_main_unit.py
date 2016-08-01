@@ -3,9 +3,9 @@ import sys
 
 if __name__=='__main__':
     dir_name = sys.argv[1]
-    print dir_name
+    print(dir_name)
     for f in glob.glob(dir_name+'/*.c'):
-        print 'Creating unit test functions for ' + f
+        print('Creating unit test functions for ' + f)
         c_file = open(f, 'r')
         orig_unit = open(f+'.units', 'r')
         mod_unit = open(f+'.units.mod', 'w')

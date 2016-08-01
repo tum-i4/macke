@@ -4,10 +4,10 @@ import os
 import glob
 from optparse import OptionParser, OptionGroup
 import re
-from source_coverage import source_coverage
-from compose_units import get_top_level_funcs, get_outlier_funcs
-from read_ktest import generate_assert_code, get_location_to_insert, modify_unit_files, get_lines_to_insert
-from second_klee_round import get_target_info
+from .source_coverage import source_coverage
+from .compose_units import get_top_level_funcs, get_outlier_funcs
+from .read_ktest import generate_assert_code, get_location_to_insert, modify_unit_files, get_lines_to_insert
+from .second_klee_round import get_target_info
 
 if __name__=='__main__':
     klee_command = 'klee --simplify-sym-indices --write-cov --write-smt2s --output-module --max-memory=1000 --disable-inlining --optimize --use-forked-solver --use-cex-cache --libc=uclibc --posix-runtime --allow-external-sym-calls --only-output-states-covering-new -max-sym-array-size=4096 -max-instruction-time=%d. --max-time=%d. --watchdog --max-memory-inhibit=false --max-static-fork-pct=1 -max-static-solve-pct=1 --max-static-cpfork-pct=1 --switch-type=internal --randomize-fork --search=nurs:covnew --use-batching-search --batch-instructions=10000 '%(10, 120)
@@ -48,14 +48,14 @@ if __name__=='__main__':
 
     if not special_components_filename=='':
         if not os.path.isfile(special_components_filename):
-            print 'The file containing special components does not exist.\nExiting'
+            print('The file containing special components does not exist.\nExiting')
             sys.exit(-1)
         sp_comps_file = open(special_components_filename, 'r')
         for line in sp_comps_file:
             sp_comps.append(line.strip())
 
     if not os.path.isdir(dir_name):
-        print 'Could not find the specified directory.\nExiting.'
+        print('Could not find the specified directory.\nExiting.')
         sys.exit(-1)
 
     if not dir_name.endswith('/'):
@@ -82,7 +82,7 @@ if __name__=='__main__':
 
                 if not make_ret==0:
                     uncompiled_files.write(f + '\n')
-                    print 'Make error\nContinuing with the next unit file...\n'
+                    print('Make error\nContinuing with the next unit file...\n')
                     time.sleep(3)
                     #user_input = raw_input('Make error')
                     continue

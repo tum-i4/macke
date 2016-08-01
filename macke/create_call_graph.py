@@ -3,7 +3,7 @@ import pydot
 import re
 from optparse import OptionParser, OptionGroup
 from clang.cindex import Index, CursorKind
-from callee import get_callee_list
+from .callee import get_callee_list
 
 COLOR_RANGE = ['#ffffff', '#ffe5e5', '#ff9999', '#ff4c4c', '#ff0000']
 SEVERITY_RANGES = {(0, 1): 0, 
@@ -58,7 +58,7 @@ def shortest_dist(source, dest, how_deep):
     if how_deep>=10:
         return 10
     min_dist = 10000
-    if source not in edges.keys():
+    if source not in list(edges.keys()):
         return min_dist
     if dest in edges[source]:
         return 1
@@ -114,7 +114,7 @@ def get_node_decoration(filename, unit_name):
 
         url = unit_name_mod + '.html'
 
-    for s in SEVERITY_RANGES.keys():
+    for s in list(SEVERITY_RANGES.keys()):
         if severity in range(s[0], s[1]):
             severity_index = SEVERITY_RANGES[s]
 
@@ -151,14 +151,14 @@ def create_pydot_nodes():
             pydot_nodes[n] = pydot.Node(n, style='filled', fillcolor=colors[n], tooltip=tooltips[n])
 
 def create_pydot_edges():
-    for n in edges.keys():
+    for n in list(edges.keys()):
         node_ends = edges[n]
 
         for e in node_ends:
             if e not in nodes:
                 continue
             if n=='main':
-                print e
+                print(e)
             pydot_edges[(pydot_nodes[n], pydot_nodes[e])] = pydot.Edge(pydot_nodes[n], pydot_nodes[e])
 
 def read_composition_file():
@@ -201,7 +201,7 @@ if __name__=='__main__':
         dir_name += '/'
 
     if not os.path.isdir(dir_name):
-        print 'There does not seem to be a directory with that name: ' + dir_name
+        print('There does not seem to be a directory with that name: ' + dir_name)
         sys.exit(-1)
 
     temp_hack(dir_name, main_file, main_file_bkp)
@@ -220,7 +220,7 @@ if __name__=='__main__':
     # Making pydot edges
     create_pydot_edges()
 
-    for pe in pydot_edges.keys():
+    for pe in list(pydot_edges.keys()):
         graph.add_edge(pydot_edges[pe])
 
     if not os.path.isdir(dir_name + HTML_SRC):

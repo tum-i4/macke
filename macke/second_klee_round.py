@@ -20,7 +20,7 @@ def get_target_info(dir_name):
         i += 1
 
         unit_filename = target_file[:-2] + '_units/' + os.path.split(target_file)[1][:-2] + '_' + func_name + '.c.units.assert'
-        print unit_filename # TODO: remove
+        print(unit_filename) # TODO: remove
 
         target_info.append((target_file.strip(), int(target_line.strip()), unit_filename))
         if i>=len(content):
@@ -75,7 +75,7 @@ if __name__=='__main__':
         make_ret = os.system('make -C '+dir_name)
 
         if not make_ret==0:
-            print 'Make error with %s_%s.c.units \nContinuing with the next unit file...\n'%(main_name, target_func)
+            print('Make error with %s_%s.c.units \nContinuing with the next unit file...\n'%(main_name, target_func))
             os.system('mv %s%s.c.bkp %s%s.c'%(dir_name, main_name, dir_name, main_name))
             time.sleep(3)
             continue

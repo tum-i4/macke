@@ -30,7 +30,7 @@ if __name__=='__main__':
                     line = istats.readline()
                     toks = line.split()
                     while line!='' and is_number(toks[0]): # Read all the lines in a function
-                        if func_name not in funcs.keys():
+                        if func_name not in list(funcs.keys()):
                             funcs[func_name] = 0
                         funcs[func_name] += int(toks[2]) # Incremention covered-instruction count for the function
                         line = istats.readline()
@@ -44,5 +44,5 @@ if __name__=='__main__':
 
     # Funcs should be full by now
 
-    print funcs
+    print(funcs)
 

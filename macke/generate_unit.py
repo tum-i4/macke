@@ -2,7 +2,7 @@
 A utility to generate a unit test case for a given C function. 
 Works by generating symbolic parameters for the function using KLEE and replacing main function
 '''
-from branch_analyzer import analyze
+from .branch_analyzer import analyze
 from clang.cindex import Index, CursorKind
 from pprint import pprint
 import sys
@@ -161,10 +161,10 @@ def copy_all_minus_main(orig_fl, node, prob_exprs):
     copy_main = '#include <klee/klee.h> // Generated code - Unit testing framework\n'
     expr_i = 0
     for i, line in enumerate(orig_fl):
-        if i+1 not in range(main_start, main_end+1):
+        if i+1 not in list(range(main_start, main_end+1)):
             copy_main = copy_main + line
             # copy_fl.write(line)
-            if i+1 in to_insert.keys():
+            if i+1 in list(to_insert.keys()):
             #while expr_i<len(prob_exprs) and i+1==prob_exprs[expr_i].line:
                 #to_paste = generate_sym_code(prob_exprs[expr_i])
                 expr_i += 1
@@ -200,7 +200,7 @@ def generate_main_aux(orig_fl, node, prob_exprs):
                 line = line.replace('main', 'main_aux')
             copy_main = copy_main + line
             # copy_fl.write(line)
-            if i+1 in to_insert.keys():
+            if i+1 in list(to_insert.keys()):
             #while expr_i<len(prob_exprs) and i+1==prob_exprs[expr_i].line:
                 # to_paste = generate_sym_code(prob_exprs[expr_i])
                 expr_i += 1
@@ -398,7 +398,7 @@ def main():
     func_name = opts.func_name
 
     if not src_fl_name.endswith('.c'):
-        print 'The input file does not seem to be a C source.\n"--help" for usage\nExiting.'
+        print('The input file does not seem to be a C source.\n"--help" for usage\nExiting.')
         sys.exit()
 
     index = Index.create()
@@ -409,7 +409,7 @@ def main():
 
     # Very important: Which function to unit test?
     if all_funcs==True:
-        print 'analysing all functions in source file: ' + src_fl_name
+        print('analysing all functions in source file: ' + src_fl_name)
         get_func_nodes(tu.cursor)
         
         for f in func_nodes:
@@ -417,17 +417,17 @@ def main():
 
     else:
         if func_name==None:
-            print 'Supply function name using flag "-n"\nOr use "-a" to analyse all functions'
+            print('Supply function name using flag "-n"\nOr use "-a" to analyse all functions')
             sys.exit(-1)
 
-        print 'analysing ' + func_name + ' in source file: ' + src_fl_name
+        print('analysing ' + func_name + ' in source file: ' + src_fl_name)
         func_names = [func_name]
 
     orig_fl = open(src_fl_name, 'r')
     for f in func_names:
         func_node = find_func_node(tu.cursor, f)
         if not func_node:
-            print 'No function found with the name: ' + f+ '\nSomething went wrong'
+            print('No function found with the name: ' + f+ '\nSomething went wrong')
             continue
             #sys.exit(-1)
         
@@ -442,7 +442,7 @@ def main():
     modified_prob_exprs = []
     for pb in prob_branch:
         if ":" not in pb:
-            print "Found some problem in branch. Trying to move on\n"
+            print("Found some problem in branch. Trying to move on\n")
             continue
         line, symb, st  = pb.split(':')[:3]
         line = int(line.strip())
@@ -453,7 +453,7 @@ def main():
             if ex.iden==symb:
                 datatype = ex.datatype
         if datatype=='':
-            print 'Something went wrong.\nExiting.'
+            print('Something went wrong.\nExiting.')
             sys.exit(-1)
 
         modified_prob_exprs.append((line, symb, datatype))
@@ -477,8 +477,8 @@ def main():
     
     hints_fl = open(src_fl_name+'.hints', 'w')
     if len(prob_branch)>0:
-        print 'Some assignments may benefit from symbolic return values -'
-        print 'Recorded these line numbers in %s.hints'%(src_fl_name)
+        print('Some assignments may benefit from symbolic return values -')
+        print('Recorded these line numbers in %s.hints'%(src_fl_name))
         hints_fl.write('line# : var : statement\n')
         for b in prob_branch:
             hints_fl.write(b+'\n')

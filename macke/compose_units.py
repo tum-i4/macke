@@ -5,7 +5,7 @@ Pre-conditions -
     2. run KLEE on separate unit tests to generate test cases
 '''
 
-from analyze_klee_test import find_ptr_errs, find_matching_error  
+from .analyze_klee_test import find_ptr_errs, find_matching_error
 from clang.cindex import Index, CursorKind
 import sys, os
 import re
@@ -20,8 +20,8 @@ def get_caller_list(dirname, func_name):
     if not dirname.endswith('/'):
         dirname = dirname + '/'
     if not os.path.exists(dirname+main_name+'_'+func_name+'.c.caller'):
-        print dirname+main_name+'_'+func_name+'.c.caller'
-        print 'The caller file for the given function does not exist.\nIgnoring and moving on'
+        print(dirname+main_name+'_'+func_name+'.c.caller')
+        print('The caller file for the given function does not exist.\nIgnoring and moving on')
         return None
     
     caller_file = open(dirname+main_name+'_'+func_name+'.c.caller')
@@ -37,13 +37,13 @@ def get_outlier_funcs(affected_funcs):
 
     func_names = [ f[1] for f in affected_funcs ]
     func_count = Counter(func_names)
-    occurences = func_count.values()
+    occurences = list(func_count.values())
     occurences = numpy.array(occurences)
     mean = numpy.mean(occurences)
     std = numpy.std(occurences)
     outlier_thres = mean + 2*std
 
-    for f in func_count.keys():
+    for f in list(func_count.keys()):
         if func_count[f]>=outlier_thres:
             outlier_names.append(f)
 
@@ -60,13 +60,13 @@ def get_container_file(dirname, caller):
         if not unit_files==[]:
             return os.path.basename(unit_dir[:-1])[:-6]+'.c'
 
-    print 'Could not find container file for that function: ' + caller
+    print('Could not find container file for that function: ' + caller)
     return None
 
 def check_parent_funcs(c_filename, func_name):
     if not os.path.exists(c_filename):
-        print c_filename
-        print 'The given filename does not exist.'
+        print(c_filename)
+        print('The given filename does not exist.')
         return [], []
 
     affected_funcs = []
@@ -88,7 +88,7 @@ def check_parent_funcs(c_filename, func_name):
 
     ptr_errs = find_ptr_errs(tests_dir)
 
-    for pe in ptr_errs.keys():
+    for pe in list(ptr_errs.keys()):
         caller_list = get_caller_list(os.path.dirname(tests_dir), pe)
         if caller_list==None:
             return [], []
@@ -200,7 +200,7 @@ if __name__=='__main__':
             if temp_unaffected_parent_funcs:
                 unaffected_parents_funcs.extend(temp_unaffected_parent_funcs)
     
-    print unaffected_parent_funcs
+    print(unaffected_parent_funcs)
     for i, func_name in enumerate(func_names):
         out_file.write(func_name+'\n')
         out_file.write(str(affected_parent_funcs[i])+'\n\n')

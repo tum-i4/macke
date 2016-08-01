@@ -6,7 +6,7 @@ import re
 
 def invert_dict(orig):
     inverted = {}
-    for key in orig.keys():
+    for key in list(orig.keys()):
         for v in orig[key]:
             if v not in inverted:
                 inverted[v] = []
@@ -36,7 +36,7 @@ if __name__=='__main__':
     exec_name = opts.executable
 
     if not os.path.isdir(dir_name):
-        print 'Could not find the specified directory.\nExiting.'
+        print('Could not find the specified directory.\nExiting.')
         sys.exit(-1)
 
     if not dir_name.endswith('/'):
@@ -46,16 +46,16 @@ if __name__=='__main__':
 
     for f in glob.glob(dir_name+'*.c'):
         if os.path.exists(f[:-2]+'_units'):
-            print 'Unit files for ' + f[:-2] + ' exists'
+            print('Unit files for ' + f[:-2] + ' exists')
             continue
-        print f
+        print(f)
         os.system('python generate_separate_unit.py -f '+f+' -a')
     
     for f in glob.glob(dir_name+'*.c'):
         base_f = f[:-2]
         unit_name = os.path.splitext(os.path.basename(f))[0]
         if not os.path.isdir(base_f+'_units'):
-            print 'No unit test directory generated for ' + f
+            print('No unit test directory generated for ' + f)
             continue
         for callee in glob.glob(base_f+'_units/'+unit_name+'_*.c.callee'):
             callee_file = open(callee, 'r')
@@ -68,7 +68,7 @@ if __name__=='__main__':
             
             for line in callee_file:
                 if not line.strip()=='':
-                    if key not in caller_dict.keys():
+                    if key not in list(caller_dict.keys()):
                         caller_dict[key] = []
                     caller_dict[key].append(line.strip())
 
@@ -78,7 +78,7 @@ if __name__=='__main__':
         base_f = f[:-2]
         unit_name = os.path.splitext(os.path.basename(f))[0]
         if not os.path.isdir(base_f+'_units'):
-            print 'No unit test directory generated for ' + f
+            print('No unit test directory generated for ' + f)
             continue
         
         for callee in glob.glob(base_f+'_units/'+unit_name+'_*.c.units'):
@@ -87,7 +87,7 @@ if __name__=='__main__':
             key = re_match.group(1)
             
             caller_file = open(base_f+'_units/'+unit_name+'_'+key+'.c.caller', 'w')
-            caller_list = inverted_caller_dict[key]if (key in inverted_caller_dict.keys()) else []
+            caller_list = inverted_caller_dict[key]if (key in list(inverted_caller_dict.keys())) else []
             
             for v in caller_list:
                 if not v=='': 

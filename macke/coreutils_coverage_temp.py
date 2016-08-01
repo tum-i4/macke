@@ -1,4 +1,4 @@
-from source_coverage import source_coverage, get_source_coverage
+from .source_coverage import source_coverage, get_source_coverage
 import glob, os
 
 cov_main = []
@@ -17,5 +17,5 @@ for c in glob.glob('/mnt/ext-hdd/coreutils-6.10/src/*.c'):
     cov_comp.extend(cov_temp)
     seen_comp.extend(seen_temp)
 
-print len(cov_main), len(seen_main)
-print len(cov_comp), len(seen_comp)
+print(len(cov_main), len(seen_main))
+print(len(cov_comp), len(seen_comp))

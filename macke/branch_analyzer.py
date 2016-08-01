@@ -297,7 +297,7 @@ def find_func_node(node, func_name):
 def get_suspect_lines(fl_name, call_table):
     orig_fl = open(fl_name, 'r')
     suspect_lines = []
-    for key in call_table.keys():
+    for key in list(call_table.keys()):
         orig_fl = open(fl_name, 'r')
         for i, line in enumerate(orig_fl):
             if i+1<call_table[key][0]:
@@ -330,7 +330,7 @@ def analyze(src_fl_name, unit_name):
 	func_node = find_func_node(tu.cursor, unit_name)
 
 	if not func_node:
-		print 'No function found with that name.\nExiting'
+		print('No function found with that name.\nExiting')
 		sys.exit(-1)
 
 	get_sym_table(func_node)
@@ -375,7 +375,7 @@ def main():
     src_fl_name = args[0]
     unit_name = args[1]
     
-    print analyze(src_fl_name, unit_name)[0]
+    print(analyze(src_fl_name, unit_name)[0])
 
 if __name__ == '__main__':
     main()

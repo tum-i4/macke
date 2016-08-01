@@ -15,7 +15,7 @@ def find_matching_error(ptr_err_directory, culp_func, culp_line):
                 break
 
         if line=='':
-            print 'Something went wrong while reading the ptr.err file.'
+            print('Something went wrong while reading the ptr.err file.')
             return False
 
         stack_lines = []
@@ -25,7 +25,7 @@ def find_matching_error(ptr_err_directory, culp_func, culp_line):
             stack_lines.append(line)
 
         if line=='':
-            print 'Something went wrong while reading the ptr.err file.'
+            print('Something went wrong while reading the ptr.err file.')
             return False
 
         for l in stack_lines:
@@ -43,7 +43,7 @@ def get_culp_line(ptr_err_filename, culp_func):
             break
 
     if line=='':
-        print 'Something went wrong while reading the ptr.err file.'
+        print('Something went wrong while reading the ptr.err file.')
         return None
 
     stack_lines = []
@@ -53,7 +53,7 @@ def get_culp_line(ptr_err_filename, culp_func):
         stack_lines.append(line)
 
     if line=='':
-        print 'Something went wrong while reading the ptr.err file.'
+        print('Something went wrong while reading the ptr.err file.')
         return None
 
     for l in stack_lines:
@@ -61,7 +61,7 @@ def get_culp_line(ptr_err_filename, culp_func):
             culp_line = int(l.split(':')[-1].strip())
             return culp_line
 
-    print 'The given function not found in the ptr.err file. Something went wrong.'
+    print('The given function not found in the ptr.err file. Something went wrong.')
     return None
 
 def get_culp_func(err_filename):
@@ -72,7 +72,7 @@ def get_culp_func(err_filename):
             break
 
     if line=='':
-        print 'Something went wrong while reading the ptr.err file.'
+        print('Something went wrong while reading the ptr.err file.')
         return None
 
     stack_lines = []
@@ -82,7 +82,7 @@ def get_culp_func(err_filename):
         stack_lines.append(line)
 
     if line=='':
-        print 'Something went wrong while reading the ptr.err file.'
+        print('Something went wrong while reading the ptr.err file.')
         return None
     
     func_line = 0
@@ -105,7 +105,7 @@ def find_ptr_errs(klee_out_dir):
         #print 'Reading pointer error from file: ' + f
         culp_func = get_culp_func(f)
         if culp_func==None:
-            print 'Returning None'
+            print('Returning None')
             return None
         
         if culp_func not in err_funcs:

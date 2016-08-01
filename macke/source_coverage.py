@@ -11,7 +11,7 @@ def get_source_coverage(c_filename, istats_path, cov_lines, seen_lines):
             break
 
     if line=='':
-        print 'Could not find source filename in the run.istats file: ' + main_filename
+        print('Could not find source filename in the run.istats file: ' + main_filename)
         return [], []
 
     fl_start = i
@@ -44,7 +44,7 @@ def source_coverage(c_filename):
         src_dir = src_dir + '/'
 
     for istats_file in glob.glob(src_dir + main_name + '_units/*/run.istats'):
-        print 'reading ' + istats_file
+        print('reading ' + istats_file)
         cov_lines, seen_lines = get_source_coverage(c_filename, istats_file, cov_lines, seen_lines)
 
     return cov_lines, seen_lines

@@ -2,7 +2,7 @@ import os, sys
 import subprocess
 import glob
 import re
-from generate_separate_unit import lookup_function_path
+from .generate_separate_unit import lookup_function_path
 from clang.cindex import Index, CursorKind
 import binascii
 
@@ -10,8 +10,8 @@ def read_ktest(ktest_path):
     sym_vars = {}
     
     if not ktest_path.endswith('.ktest'):
-        print ktest_path
-        print 'The filename is not a ktest file.\n'
+        print(ktest_path)
+        print('The filename is not a ktest file.\n')
         return sym_vars
    
     ktest_dir = os.path.dirname(ktest_path)
@@ -86,7 +86,7 @@ def get_comparison_stmt(ktests, sym_var_names):
         temp_oracle = 'int comp_des_' + str(i) + ' = ('
         for j, s in enumerate(k.keys()):
             temp_oracle += '(memcmp(st_%s, %s_%i, sizeof(%s_%i))==0)'%(s, s, i, s, i)
-            if j+1<len(k.keys()):
+            if j+1<len(list(k.keys())):
                 temp_oracle += ' && '
         temp_oracle += ');\n'
         oracles.append(temp_oracle)
@@ -115,7 +115,7 @@ def get_memcpy_stmt(sym_var_names):
     return memcpy_stmt
 
 def generate_assert_code(ktest_folder):
-    print "Generating assert code from - " + ktest_folder
+    print("Generating assert code from - " + ktest_folder)
     if not ktest_folder.endswith('/'):
         ktest_folder += '/'
 
@@ -127,7 +127,7 @@ def generate_assert_code(ktest_folder):
 
     sym_var_names = []
     if not ktests==[]:
-        for k in ktests[0].keys():
+        for k in list(ktests[0].keys()):
             sym_var_names.append(k)
 
     memcpy_stmt = get_memcpy_stmt(sym_var_names)
@@ -135,7 +135,7 @@ def generate_assert_code(ktest_folder):
 
     last_temp_buffer_decl_stmt = ''
     for i, ktest in enumerate(ktests):
-        for s in ktest.keys():
+        for s in list(ktest.keys()):
             temp_buffer_decl_stmt = get_expected_buffer_decl_stmt(s, ktest[s][0], ktest[s][1], i)
             if temp_buffer_decl_stmt=='':
                 temp_buffer_decl_stmt = last_temp_buffer_decl_stmt
@@ -191,9 +191,9 @@ def get_lines_to_insert(files_funcs, call_name):
                 if call_line:
                     lines.append((filename, func_name, call_line))
                 else:
-                    print 'Problem with file: %s caller function: %s callee function: %s'%(filename, func_name, call_name)
+                    print('Problem with file: %s caller function: %s callee function: %s'%(filename, func_name, call_name))
         except Exception:
-            print 'Problem with file: %s caller function: %s callee function: %s'%(filename, func_name, call_name)
+            print('Problem with file: %s caller function: %s callee function: %s'%(filename, func_name, call_name))
             continue
     return lines
 
@@ -267,7 +267,7 @@ def get_location_to_insert(ktest_folder):
     return lines_to_insert
 
 def copy_and_modify_unit_file(unit_filename, line_n, assertion_code):
-    print line_n
+    print(line_n)
     memcpy_stmt, buffer_decl_stmt, comparison_stmt = assertion_code
     orig_file = open(unit_filename, 'r')
     copy_file = open(unit_filename+'.assert', 'w+')
@@ -299,11 +299,11 @@ def modify_unit_files(locations_to_insert, assertion_code):
 if __name__=='__main__':
     ktest_folder = sys.argv[1]
     memcpy_stmt, buffer_decl_stmt, comparison_stmt = generate_assert_code(ktest_folder)
-    print memcpy_stmt, buffer_decl_stmt, comparison_stmt
+    print(memcpy_stmt, buffer_decl_stmt, comparison_stmt)
     assertion_code = (memcpy_stmt, buffer_decl_stmt, comparison_stmt)
 
     locations_to_insert = get_location_to_insert(ktest_folder)
-    print locations_to_insert
+    print(locations_to_insert)
 
     modify_unit_files(locations_to_insert, assertion_code)
 
