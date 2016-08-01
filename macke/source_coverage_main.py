@@ -1,4 +1,4 @@
-from .source_coverage import get_source_coverage
+from source_coverage import get_source_coverage
 import os, glob
 from optparse import OptionParser, OptionGroup
 

@@ -2,7 +2,7 @@
 A utility to generate a unit test case for a given C function. 
 Works by generating symbolic parameters for the function using KLEE and replacing main function
 '''
-from .branch_analyzer import analyze
+from branch_analyzer import analyze
 from clang.cindex import Index, CursorKind
 from pprint import pprint
 import sys

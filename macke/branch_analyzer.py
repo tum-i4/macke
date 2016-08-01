@@ -158,7 +158,7 @@ def lookup_decl_ref_exprs(node):
     exprs = []
     if node.kind==CursorKind.DECL_REF_EXPR:
         expr = Expr(node.location, node.displayname, node.type.spelling)
-	exprs = [expr]
+        exprs = [expr]
     else:
         ch = [c for c in node.get_children()]
         for c in ch:
@@ -182,7 +182,7 @@ def get_info(node):
 
     ch = [c for c in node.get_children()]
     if node.kind==CursorKind.IF_STMT or node.kind==CursorKind.WHILE_STMT:
-		proc_if_statement(node, node.location.line)
+        proc_if_statement(node, node.location.line)
     for c in ch:
         get_info(c)
     '''
@@ -282,7 +282,7 @@ def get_call_table(node, iden):
 
 def find_func_node(node, func_name):
     if node.kind==CursorKind.FUNCTION_DECL and node.spelling==func_name and str(node.location.file).endswith('.c'):
-	return node
+        return node
     else:
         ch = [c for c in node.get_children()]
         if ch==[]:

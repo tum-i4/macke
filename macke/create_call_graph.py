@@ -3,7 +3,7 @@ import pydot
 import re
 from optparse import OptionParser, OptionGroup
 from clang.cindex import Index, CursorKind
-from .callee import get_callee_list
+from callee import get_callee_list
 
 COLOR_RANGE = ['#ffffff', '#ffe5e5', '#ff9999', '#ff4c4c', '#ff0000']
 SEVERITY_RANGES = {(0, 1): 0, 

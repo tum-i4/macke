@@ -1,7 +1,7 @@
 from clang.cindex import Index, CursorKind
-from .branch_analyzer import analyze
+from branch_analyzer import analyze
 import sys, os
-from .generate_unit import find_func_node
+from generate_unit import find_func_node
 
 def get_callee_list_rec(node, callee_list):
     ch = [c for c in node.get_children()]

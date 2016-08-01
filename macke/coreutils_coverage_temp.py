@@ -1,4 +1,4 @@
-from .source_coverage import source_coverage, get_source_coverage
+from source_coverage import source_coverage, get_source_coverage
 import glob, os
 
 cov_main = []
