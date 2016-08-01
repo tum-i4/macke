@@ -31,3 +31,9 @@ test: venv
 
 .PHONY: venv
 venv: .venv/bin/activate
+
+.PHONY: clean
+clean:
+	@ rm -rf .venv
+	@ rm -rf macke.egg-info
+	@ rm -rf macke/__pycache__
