@@ -1,3 +1,4 @@
+CLANG ?= $$HOME/build/llvm/Release/bin/clang
 
 .PHONY: all
 all: help
@@ -37,3 +38,8 @@ clean:
 	@ rm -rf .venv
 	@ rm -rf macke.egg-info
 	@ rm -rf macke/__pycache__
+	@ rm -rf tests/__pycache__
+	@ rm -f examples/*.bc
+
+examples/%.bc: examples/%.c
+	$(CLANG) -c -emit-llvm -O0 -g $^ -o $@

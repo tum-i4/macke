@@ -26,3 +26,7 @@ var/
 
 # IDE project files
 .idea/
+
+# LLVM stuff
+*.bc
+*.ll
