@@ -14,6 +14,11 @@ setup(
     author="Saahil Ognawala",
     author_email="ognawala@in.tum.de",
     license="Apache Software License",
+    entry_points={
+        'console_scripts': [
+            'macke = macke.__main__:main'
+        ]
+    },
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
         'Development Status :: 3 - Alpha',
