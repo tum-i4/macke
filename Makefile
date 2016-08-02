@@ -17,7 +17,7 @@ dev: venv
 	@ echo "Please switch with 'source .venv/bin/activate'"
 
 .PHONY: test
-test: venv
+test: venv examples/divisible.bc
 	.venv/bin/python -m unittest
 
 # Initialize the virtual environment, if needed

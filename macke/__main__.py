@@ -2,6 +2,7 @@
 Start a complete analysis with the MACKE toolchain on a given bitcode file
 """
 import argparse
+from .Macke import Macke
 
 
 def main():
@@ -24,9 +25,8 @@ def main():
 
     args = parser.parse_args()
 
-    print("Hello world")
-    print(args)
-
+    m = Macke(args.bcfile.name)
+    m.run_complete_analysis()
 
 if __name__ == "__main__":
     main()
