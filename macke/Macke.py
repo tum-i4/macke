@@ -11,7 +11,7 @@ from time import sleep
 from .CallGraph import CallGraph
 from .config import THREADNUM
 from .Klee import KleeRound
-from .llvm_wrapper import encapsulate_symbolic, extract_callgraph
+from .llvm_wrapper import encapsulate_symbolic
 
 
 class Macke:
@@ -52,7 +52,7 @@ class Macke:
 
     def run_phase_one(self):
         # Generate a call graph
-        self.callgraph = CallGraph(extract_callgraph(self.bitcodefile))
+        self.callgraph = CallGraph(self.bitcodefile)
 
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.get_candidates_for_symbolic_encapsulation()

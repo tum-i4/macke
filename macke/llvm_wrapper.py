@@ -6,8 +6,15 @@ import json
 import subprocess
 
 
-def extract_callgraph(bitcodefile):
+def list_all_funcs_topological(bitcodefile):
+    jsonout = subprocess.check_output([
+        LLVMOPT, "-load", LIBMACKEOPT,
+        "--listallfuncstopologic", bitcodefile,
+        "-disable-output"])
+    return json.loads(jsonout.decode("utf-8"))
 
+
+def extract_callgraph(bitcodefile):
     jsonout = subprocess.check_output([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-extractcallgraph", bitcodefile,
