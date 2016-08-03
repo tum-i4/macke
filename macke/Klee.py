@@ -2,6 +2,7 @@
 Container, that store all information about a klee run
 """
 
+import re
 import subprocess
 from .config import KLEEBIN
 
@@ -32,5 +33,10 @@ class KleeRound:
         # Mark this KLEE run as executed
         self.executed = True
 
-    def contains_errors(self):
+    def does_contains_errors(self):
         return "KLEE: ERROR:" in self.output
+
+    def get_statistics(self):
+        m = re.search(r"KLEE: done: generated tests = (\d+)", self.output)
+        numtests = int(m.group(1)) if m else 0
+        return numtests, self.output.count("KLEE: ERROR:")

@@ -45,6 +45,7 @@ class Macke:
 
         # TODO copy current git hash of macke
         # TODO copy config file
+        # TODO add self.bitcodefile information
 
         # Print some information for the user
         print("Start analysis of %s in %s" % (self.bitcodefile, self.rundir))
@@ -80,13 +81,26 @@ class Macke:
         # close the pool after all KLEE runs registered before
         pool.close()
 
+        # Keeping track of the progress until everything is done
         with ProgressBar(max_value=len(kleetodos)) as bar:
             while len(kleedones) != len(kleetodos):
                 bar.update(len(kleedones))
                 sleep(0.3)
             bar.update(len(kleedones))
 
-        # TODO do something with the results in kleedones
+        # initialize some counters
+        errfunc, errtotal, testcases = 0, 0, 0
+
+        for k in kleedones:
+            errfunc += 1 if k.does_contains_errors() else 0
+            c, t = k.get_statistics()
+            testcases += c
+            errtotal += t
+            # TODO prepare them for phase two
+
+        print("Phase 1: %d test cases generated. "
+              "Found %d total errors in %d functions" %
+              (testcases, errtotal, errfunc))
 
     def prepare_phase_one_klee(self, encapsulated):
         """
@@ -95,7 +109,7 @@ class Macke:
         result = KleeRound(
             self.encapsulated_bcfile,
             path.join(self.rundir, "klee-out-%d" % self.kleecount),
-            [],
+            [],  # TODO add relevant flags
             "macke_%s_main" % encapsulated
         )
         self.kleecount += 1
