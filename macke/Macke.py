@@ -91,7 +91,7 @@ class Macke:
         pool.close()
 
         if not self.quiet:
-            # Keeping track of the progress until everything is done
+            # Keeping track of the progress until everything is working
             with ProgressBar(max_value=len(tasks)) as bar:
                 while len(kleedones) != len(tasks):
                     bar.update(len(kleedones))

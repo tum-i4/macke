@@ -36,6 +36,8 @@ class TestMackePhaseOne(unittest.TestCase):
     def test_with_several_asserts(self):
         m = self.run_macke_test_on_file("examples/small.bc")
 
+        # 2 for f2, 3 for f3 and sum of both for f1
         self.assertEqual(m.testcases, 10)
+        # 3 for f1, 1 for f2, 2 for f3
         self.assertEqual(m.errtotalcount, 6)
         self.assertEqual(m.errfunccount, 3)
