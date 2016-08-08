@@ -7,36 +7,37 @@ import subprocess
 from .config import KLEEBIN
 
 
-class KleeRound:
+class KleeResult:
 
-    def __init__(self, bcfile, outdir, flags=None, entrypoint="main"):
+    def __init__(self, bcfile, outdir, stdoutput, flags=None):
+        # Set all atttributes given by the constructor
         self.bcfile = bcfile
         self.outdir = outdir
-        self.entrypoint = entrypoint
         self.flags = [] if flags is None else flags
-        self.executed = False
-        self.output = "No run yet"
+        self.stdoutput = stdoutput
+
+        # Calculate some statistics
+        self.errorcount = self.stdoutput.count("KLEE: ERROR:")
+
+        m = re.search(r"KLEE: done: generated tests = (\d+)", self.stdoutput)
+        self.testcount = int(m.group(1)) if m else 0
 
     def __str__(self):
-        return "KLEE in %s: %s" % (self.outdir, self.output)
+        return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
 
-    def run(self):
-        # assert, that this round was not run earlier
-        assert not self.executed
 
-        # Execute KLEE with all details and store the output
-        self.output = subprocess.check_output([
-            KLEEBIN, "--entry-point=" + self.entrypoint,
-            "--output-dir=" + self.outdir] + self.flags + [self.bcfile],
-            stderr=subprocess.STDOUT).decode("utf-8")
+def execute_klee(bcfile, outdir, flags=None):
+    """
+    Execute KLEE on bcfile with the given flag and put the output in outdir
+    """
 
-        # Mark this KLEE run as executed
-        self.executed = True
+    # use empty list as default flags
+    flags = [] if flags is None else flags
 
-    def does_contains_errors(self):
-        return "KLEE: ERROR:" in self.output
+    # actually run KLEE
+    out = subprocess.check_output([
+        KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile],
+        stderr=subprocess.STDOUT).decode("utf-8")
 
-    def get_statistics(self):
-        m = re.search(r"KLEE: done: generated tests = (\d+)", self.output)
-        numtests = int(m.group(1)) if m else 0
-        return numtests, self.output.count("KLEE: ERROR:")
+    # Return a filled result container
+    return KleeResult(bcfile, outdir, out, flags)

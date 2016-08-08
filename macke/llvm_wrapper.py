@@ -6,33 +6,60 @@ import json
 import subprocess
 
 
+def __run_subprocess(popenargs):
+    """
+    Starts a subprocess with popenargs and returns it output
+    """
+    return subprocess.check_output(popenargs)
+
+
+def __run_subprocess_with_json_output(popenargs):
+    """
+    Starts a subprocess with popenargs and returns the output as parsed json
+    """
+    out = __run_subprocess(popenargs)
+    return json.loads(out.decode("utf-8"))
+
+
 def list_all_funcs_topological(bitcodefile):
-    jsonout = subprocess.check_output([
+    """
+    Wrapper around the list all functions pass
+    """
+    return __run_subprocess_with_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
         "--listallfuncstopologic", bitcodefile,
         "-disable-output"])
-    return json.loads(jsonout.decode("utf-8"))
 
 
 def extract_callgraph(bitcodefile):
-    jsonout = subprocess.check_output([
+    """
+    Wrapper around the extract callgraph pass
+    """
+    return __run_subprocess_with_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-extractcallgraph", bitcodefile,
         "-disable-output"])
 
-    return json.loads(jsonout.decode("utf-8"))
 
+def encapsulate_symbolic(
+        sourcefile, function, destfile=None, removeunused=True):
+    """
+    Wrapper around the encapsulate symbolic pass
+    """
+    additional_passes = []
 
-def encapsulate_symbolic(sourcefile, function, outfile=None):
+    if removeunused:
+        # Add some passes to eliminate all unused functions
+        additional_passes += [
+            "-internalize-public-api-list=main",
+            "-internalize", "-globalopt", "-globaldce", "-adce"]
 
-    # If no outfile is given, just modify the source file
-    if outfile is None:
-        outfile = sourcefile
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
 
-    out = subprocess.check_output([
+    return __run_subprocess([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-encapsulatesymbolic", sourcefile,
-        "-encapsulatedfunction", function,
-        "-o", outfile])
-
-    return out
+        "-encapsulatedfunction", function] + additional_passes +
+        ["-o", destfile])
