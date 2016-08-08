@@ -23,7 +23,8 @@ def __run_subprocess_with_json_output(popenargs):
 
 def list_all_funcs_topological(bitcodefile):
     """
-    Wrapper around the list all functions pass
+    Wrapper around the list all functions pass. Any circles or strongly
+    connected components are listed alphabetically in nested lists
     """
     return __run_subprocess_with_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
