@@ -16,7 +16,10 @@ from .llvm_wrapper import encapsulate_symbolic
 
 class Macke:
 
-    def __init__(self, bitcodefile, parentdir="/tmp/macke"):
+    def __init__(self, bitcodefile, parentdir="/tmp/macke", quiet=False):
+        # Only accept valid files and directory
+        assert(path.isfile(bitcodefile))
+
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
@@ -32,6 +35,9 @@ class Macke:
 
         # Internal counter for the number of klee runs
         self.kleecount = 1
+
+        # Setting quiet == True suppress all outputs
+        self.quiet = quiet
 
     def get_next_klee_directory(self):
         result = path.join(self.rundir, "klee-out-%d" % self.kleecount)
@@ -55,7 +61,8 @@ class Macke:
         # TODO add self.bitcodefile information
 
         # Print some information for the user
-        print("Start analysis of %s in %s" % (self.bitcodefile, self.rundir))
+        self.qprint(
+            "Start analysis of %s in %s" % (self.bitcodefile, self.rundir))
 
     def run_phase_one(self):
         # Generate a call graph
@@ -64,8 +71,8 @@ class Macke:
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.get_candidates_for_symbolic_encapsulation()
 
-        print("Phase 1: %d of %d functions are suitable for symbolic "
-              "encapsulation" % (len(tasks), len(self.callgraph.graph)))
+        self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
+                    "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
         # Create a parallel pool with a process for each cpu thread
         pool = Pool(THREADNUM)
@@ -83,28 +90,35 @@ class Macke:
         # close the pool after all KLEE runs registered
         pool.close()
 
-        # Keeping track of the progress until everything is done
-        with ProgressBar(max_value=len(tasks)) as bar:
-            while len(kleedones) != len(tasks):
+        if not self.quiet:
+            # Keeping track of the progress until everything is done
+            with ProgressBar(max_value=len(tasks)) as bar:
+                while len(kleedones) != len(tasks):
+                    bar.update(len(kleedones))
+                    sleep(0.3)
                 bar.update(len(kleedones))
-                sleep(0.3)
-            bar.update(len(kleedones))
+        pool.join()
 
-        # initialize some counters
-        errfunc, errtotal, testcases = 0, 0, 0
+        # fill some counters
+        self.testcases = sum(k.testcount for k in kleedones)
+        self.errfunccount = sum(k.errorcount != 0 for k in kleedones)
+        self.errtotalcount = sum(k.errorcount for k in kleedones)
 
-        for k in kleedones:
-            errfunc += 1 if k.errorcount != 0 else 0
-            testcases += k.testcount
-            errtotal += k.errorcount
-            # TODO prepare them for phase two
+        self.qprint("Phase 1: %d test cases generated. "
+                    "Found %d total errors in %d functions" %
+                    (self.testcases, self.errtotalcount, self.errfunccount))
 
-        print("Phase 1: %d test cases generated. "
-              "Found %d total errors in %d functions" %
-              (testcases, errtotal, errfunc))
+        # TODO prepare them for phase two
 
     def run_phase_two(self):
-        print("Phase 2: ... is not working ... yet ^^")
+        self.qprint("Phase 2: ... is not working ... yet ^^")
+
+    def qprint(self, *args, **kwargs):
+        if not self.quiet:
+            print(*args, **kwargs)
+
+    def delete_directory(self):
+        shutil.rmtree(self.rundir, ignore_errors=True)
 
 
 def thread_phase_one(functionname, program_bc, bcdir, outdir):
