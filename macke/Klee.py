@@ -42,3 +42,11 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None):
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
+
+
+def execute_klee_targeted_search(
+        bcfile, analyzedfunc, targetfunc, outdir, flags=None):
+    # use empty list as default flags
+    flags = [] if flags is None else flags
+    flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
+    return execute_klee(bcfile, analyzedfunc, outdir, flags)

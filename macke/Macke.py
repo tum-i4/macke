@@ -10,8 +10,8 @@ import shutil
 from time import sleep
 from .CallGraph import CallGraph
 from .config import THREADNUM
-from .Klee import execute_klee
-from .llvm_wrapper import encapsulate_symbolic
+from .Klee import execute_klee, execute_klee_targeted_search
+from .llvm_wrapper import encapsulate_symbolic, prepend_error
 
 
 class Macke:
@@ -34,7 +34,7 @@ class Macke:
         self.program_bc = path.join(self.rundir, "program.bc")
 
         # Internal counter for the number of klee runs
-        self.kleecount = 1
+        self.kleecount = 0
 
         # Initialize some statistic counter
         self.testcases = 0
@@ -48,14 +48,15 @@ class Macke:
         self.quiet = quiet
 
     def get_next_klee_directory(self):
-        result = path.join(self.rundir, "klee-out-%d" % self.kleecount)
         self.kleecount += 1
+        result = path.join(self.rundir, "klee-out-%d" % self.kleecount)
         return result
 
     def run_complete_analysis(self):
         self.run_initialization()
         self.run_phase_one()
         self.run_phase_two()
+        self.run_finalization()
 
     def run_initialization(self):
         # Create an empty run directory with empty bitcode directory
@@ -101,33 +102,81 @@ class Macke:
         pool.close()
 
         if not self.quiet:
-            # Keeping track of the progress until everything is working
-            with ProgressBar(max_value=len(tasks)) as bar:
-                while len(kleedones) != len(tasks):
-                    bar.update(len(kleedones))
-                    sleep(0.3)
+            # Keeping track of the progress until everything is done
+            bar = ProgressBar(max_value=len(tasks))
+            while len(kleedones) != len(tasks):
                 bar.update(len(kleedones))
+                sleep(0.3)
+            bar.update(len(kleedones))
+            bar.finish()
         pool.join()
 
-        for k in kleedones:
-            # fill some counters
-            self.testcases += k.testcount
-            self.errfunccount += k.errorcount != 0
-            self.errtotalcount += k.errorcount
+        self.register_passed_klee_runs(kleedones)
 
-            # store runs uncovering errors for phase two
-            if k.errorcount != 0:
-                if k.analyzedfunc in self.errorkleeruns:
-                    self.errorkleeruns[k.analyzedfunc].append(k.outdir)
-                else:
-                    self.errorkleeruns[k.analyzedfunc] = [k.outdir]
-
-        self.qprint("Phase 1: %d test cases generated. "
-                    "Found %d total errors in %d functions" %
-                    (self.testcases, self.errtotalcount, self.errfunccount))
+        self.qprint("Phase 1: Found %d errors spread over %d functions" %
+                    (self.errtotalcount, self.errfunccount))
 
     def run_phase_two(self):
-        self.qprint("Phase 2: ... is not working ... yet ^^")
+        # Get (caller,callee)-pairs grouped in serialized runs
+        runs = self.callgraph.get_grouped_edges_for_call_chain_propagation()
+
+        # Store old counter to calculate progress in phase two
+        olderrfunccount = self.errfunccount
+
+        # Calculate some statistics
+        qualified = sum(len(run) for run in runs)
+        total = sum(len(value["calls"])
+                    for key, value in self.callgraph.graph.items()
+                    if key != "null function")
+        # TODO count also calls from main if flag is given
+        self.qprint("Phase 2: %d of %d calls are suitable for error chain "
+                    "propagation" % (qualified, total))
+
+        bar = ProgressBar(max_value=qualified)
+        skipped = 0
+
+        # all pairs inside a run can be executed in parallel
+        for run in runs:
+            # Initialize the pool of workers
+            pool = Pool(THREADNUM)
+            # Storage for the result
+            kleedones = []
+
+            for (caller, callee) in run:
+                if callee in self.errorkleeruns:
+                    pool.apply_async(thread_phase_two, (
+                        caller, callee, self.errorkleeruns[callee],
+                        self.bcdir, self.get_next_klee_directory()
+                    ), callback=kleedones.append)
+                else:
+                    skipped += 1
+            pool.close()
+
+            if not self.quiet:
+                # Keeping track of the progress until everything is done
+                while (len(kleedones) + skipped) != qualified:
+                    bar.update(len(kleedones) + skipped)
+                    sleep(0.3)
+                bar.update(len(kleedones) + skipped)
+                bar.finish()
+            pool.join()
+
+            # Store the klees with error for next runs
+            self.register_passed_klee_runs(kleedones)
+
+        # TODO run main if arguments for it are given
+
+        self.qprint("Phase 2: %d additional KLEE analyses were started" %
+                    (qualified - skipped))
+        self.qprint("Phase 2: errors were propagated to %d previously not "
+                    "affected functions" %
+                    (self.errfunccount - olderrfunccount))
+
+    def run_finalization(self):
+        self.qprint("Summary: %d tests were generated with %d KLEE runs" %
+                    (self.testcases, self.kleecount))
+        self.qprint("Summary: %d errors were detected spread over %d "
+                    "functions" % (self.errtotalcount, self.errfunccount))
 
     def qprint(self, *args, **kwargs):
         if not self.quiet:
@@ -135,6 +184,27 @@ class Macke:
 
     def delete_directory(self):
         shutil.rmtree(self.rundir, ignore_errors=True)
+
+    def register_passed_klee_runs(self, kleedones):
+        for k in kleedones:
+            self.register_passed_klee_run(k)
+
+    def register_passed_klee_run(self, kleedone):
+        # Just give it a shorter name
+        k = kleedone
+
+        # fill some counters
+        self.testcases += k.testcount
+        self.errfunccount += (
+            k.errorcount != 0 and k.analyzedfunc not in self.errorkleeruns)
+        self.errtotalcount += k.errorcount
+
+        # store runs uncovering errors for phase two
+        if k.errorcount != 0:
+            if k.analyzedfunc in self.errorkleeruns:
+                self.errorkleeruns[k.analyzedfunc].append(k.outdir)
+            else:
+                self.errorkleeruns[k.analyzedfunc] = [k.outdir]
 
 
 def thread_phase_one(functionname, program_bc, bcdir, outdir):
@@ -151,3 +221,22 @@ def thread_phase_one(functionname, program_bc, bcdir, outdir):
     # Run KLEE on it
     # TODO add relevant flags
     return execute_klee(encapsulated_bcfile, functionname, outdir, [])
+
+
+def thread_phase_two(caller, callee, errordirlist, bcdir, outdir):
+    """
+    This function is executed by the parallel processes in phase two
+    """
+    # TODO add relevant flags
+    # TODO globalize file names sym-...bc and chain-...bc
+
+    # Generate required file names
+    source_bc = path.join(bcdir, "sym-%s.bc" % caller)
+    # TODO comment: - are not allowed in c function name
+    prepended_bc = path.join(bcdir, "chain-%s-%s.bc" % (caller, callee))
+
+    # Prepend the error summaries
+    prepend_error(source_bc, callee, errordirlist, prepended_bc)
+
+    # And run klee on it
+    return execute_klee_targeted_search(prepended_bc, caller, callee, outdir)

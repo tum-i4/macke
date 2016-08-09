@@ -47,20 +47,37 @@ def encapsulate_symbolic(
     """
     Wrapper around the encapsulate symbolic pass
     """
-    additional_passes = []
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
 
+    additional_passes = []
     if removeunused:
         # Add some passes to eliminate all unused functions
         additional_passes += [
             "-internalize-public-api-list=main",
             "-internalize", "-globalopt", "-globaldce", "-adce"]
 
-    # If no destfile is given, just modify the source file
-    if destfile is None:
-        destfile = sourcefile
-
     return __run_subprocess([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-encapsulatesymbolic", sourcefile,
         "-encapsulatedfunction", function] + additional_passes +
         ["-o", destfile])
+
+
+def prepend_error(sourcefile, function, errordirlist, destfile=None):
+    """
+    Wrapper around the prepend error pass
+    """
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
+
+    errordirflags = []
+    for errordir in errordirlist:
+        errordirflags.append("-previouskleerundirectory")
+        errordirflags.append(errordir)
+
+    return __run_subprocess([
+        LLVMOPT, "-load", LIBMACKEOPT, "-preprenderror", sourcefile,
+        "-prependtofunction", function] + errordirflags + ["-o", destfile])
