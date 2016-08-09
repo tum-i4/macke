@@ -28,7 +28,7 @@ def list_all_funcs_topological(bitcodefile):
     """
     return __run_subprocess_with_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
-        "--listallfuncstopologic", bitcodefile,
+        "-listallfuncstopologic", bitcodefile,
         "-disable-output"])
 
 
