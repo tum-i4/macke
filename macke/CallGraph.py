@@ -52,30 +52,31 @@ class CallGraph:
         # Regroup the topological ordered function list in independent units
         units = []
         independent = set()
-        calledEarlier = set()
+        callEarlier = set()
 
-        for topo in reversed(self.topology):
+        for topo in self.topology:
             if isinstance(topo, str):
-                if topo in calledEarlier:
+                if topo in callEarlier:
                     # Add all function, that are called earlier
                     if independent:
                         units.append(sorted(list(independent)))
                     # And restart the search
-                    independent = set({topo})
-                else:
-                    # Mark this function as indepent
-                    independent.add(topo)
+                    independent = set()
+                    callEarlier = set()
 
+                # Mark this function as indepent
+                independent.add(topo)
                 # Mark all function called by now
-                calledEarlier = set(self[topo]['calls'])
+                callEarlier |= set(self[topo]['calledby'])
+
             else:
-                # Add all previous independet functions
+                # Add all previous independent functions
                 if independent:
                     units.append(sorted(list(independent)))
                     independent = set()
 
                 # Split each part of a scc in a separate run
-                for t in reversed(sorted(topo)):
+                for t in sorted(topo):
                     units.append([t])
 
         # Add all remaining elements
@@ -85,16 +86,16 @@ class CallGraph:
 
         # Convert the unit list of functions to a list of callers
         result = []
-        for u in reversed(units):
+        for u in units:
             ps = []
-            for caller in u:
-                if not self[caller]['hasdoubleptrarg']:
-                    for callee in sorted(self[caller]['calls']):
-                        if (not self[caller]['isexternal'] and
-                                not self[callee]['isexternal']):
-                            ps.append((caller, callee))
+            for callee in u:
+                for caller in self[callee]['calledby']:
+                    if (not self[caller]['hasdoubleptrarg'] and
+                            not self[caller]['isexternal'] and
+                            not self[callee]['isexternal']):
+                        ps.append((caller, callee))
             if ps:
-                result.append(ps)
+                result.append(sorted(ps))
 
         # (partially) assert correctness of the result
         for r in result:

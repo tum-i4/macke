@@ -35,11 +35,18 @@ class TestCallGraph(unittest.TestCase):
 
         self.assertEqual(6, len([pair for run in c for pair in run]))
 
+        # This asserts are specifig to the grouping strategy
+        # If you change the strategy, you probably have to change this
+        self.assertEqual(c[0], [
+            ('divby10', 'divby2'), ('divby10', 'divby5'),
+            ('divby30', 'divby3'), ('divby6', 'divby2'), ('divby6', 'divby3')])
+        self.assertEqual([('divby30', 'divby10')], c[1])
+
     def test_edges_for_call_chain_propagation_circle(self):
         bcfile = "./examples/doomcircle.bc"
         c = CallGraph(bcfile).get_grouped_edges_for_call_chain_propagation()
 
-        self.assertEqual(c, [[('a', 'b')], [('b', 'c')], [('c', 'a')]])
+        self.assertEqual(c, [[('c', 'a')], [('a', 'b')], [('b', 'c')]])
 
     def test_edges_for_call_chain_propagation_small(self):
         bcfile = "./examples/small.bc"
