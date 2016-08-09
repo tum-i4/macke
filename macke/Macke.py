@@ -83,35 +83,11 @@ class Macke:
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
-        # Create a parallel pool with a process for each cpu thread
-        pool = Pool(THREADNUM)
-
-        # Storage for all complete runs
-        kleedones = []
-
-        # TODO store mapping of KLEE out directory -> function analyzed in dir
-
-        # Dispense the KLEE runs on the workers in the pool
-        for function in tasks:
-            pool.apply_async(thread_phase_one, (
-                function, self.program_bc, self.bcdir,
-                self.get_next_klee_directory()
-            ), callback=kleedones.append)
-
-        # close the pool after all KLEE runs registered
-        pool.close()
+        bar = ProgressBar(max_value=len(tasks)) if not self.quiet else None
+        self.execute_in_parallel_threads(tasks, 1, bar)
 
         if not self.quiet:
-            # Keeping track of the progress until everything is done
-            bar = ProgressBar(max_value=len(tasks))
-            while len(kleedones) != len(tasks):
-                bar.update(len(kleedones))
-                sleep(0.3)
-            bar.update(len(kleedones))
             bar.finish()
-        pool.join()
-
-        self.register_passed_klee_runs(kleedones)
 
         self.qprint("Phase 1: Found %d errors spread over %d functions" %
                     (self.errtotalcount, self.errfunccount))
@@ -129,45 +105,24 @@ class Macke:
                     for key, value in self.callgraph.graph.items()
                     if key != "null function")
         # TODO count also calls from main if flag is given
+
         self.qprint("Phase 2: %d of %d calls are suitable for error chain "
                     "propagation" % (qualified, total))
 
-        bar = ProgressBar(max_value=qualified)
-        skipped = 0
+        totallyskipped = 0
+        bar = ProgressBar(max_value=qualified) if not self.quiet else None
 
-        # all pairs inside a run can be executed in parallel
         for run in runs:
-            # Initialize the pool of workers
-            pool = Pool(THREADNUM)
-            # Storage for the result
-            kleedones = []
+            # all pairs inside a run can be executed in parallel
+            totallyskipped += self.execute_in_parallel_threads(run, 2, bar)
 
-            for (caller, callee) in run:
-                if callee in self.errorkleeruns:
-                    pool.apply_async(thread_phase_two, (
-                        caller, callee, self.errorkleeruns[callee],
-                        self.bcdir, self.get_next_klee_directory()
-                    ), callback=kleedones.append)
-                else:
-                    skipped += 1
-            pool.close()
-
-            if not self.quiet:
-                # Keeping track of the progress until everything is done
-                while (len(kleedones) + skipped) != qualified:
-                    bar.update(len(kleedones) + skipped)
-                    sleep(0.3)
-                bar.update(len(kleedones) + skipped)
-                bar.finish()
-            pool.join()
-
-            # Store the klees with error for next runs
-            self.register_passed_klee_runs(kleedones)
+        if not self.quiet:
+            bar.finish()
 
         # TODO run main if arguments for it are given
 
         self.qprint("Phase 2: %d additional KLEE analyses were started" %
-                    (qualified - skipped))
+                    (qualified - totallyskipped))
         self.qprint("Phase 2: errors were propagated to %d previously not "
                     "affected functions" %
                     (self.errfunccount - olderrfunccount))
@@ -184,6 +139,66 @@ class Macke:
 
     def delete_directory(self):
         shutil.rmtree(self.rundir, ignore_errors=True)
+
+    def execute_in_parallel_threads(self, run, phase, pbar):
+        assert(phase == 1 or phase == 2)
+
+        if not self.quiet:
+            # Store the state of the progressbar before running anything
+            donebefore = pbar.value if pbar is not None else 0
+
+        # Create a pool with a fixed number of parallel processes
+        # Either use the configured number of thread or one for each cpu thread
+        pool = Pool(THREADNUM)
+        # Storage for the result of the runs
+        kleedones = []
+
+        # Dispense the KLEE runs on the workers in the pool
+        skipped = self.put_phase_threads_into_pool(phase, pool, run, kleedones)
+
+        # close the pool after all KLEE runs are registered
+        pool.close()
+
+        if not self.quiet:
+            # Keeping track of the progress until everything is done
+            while (len(kleedones) + skipped) != len(run):
+                pbar.update(donebefore + len(kleedones) + skipped)
+                sleep(0.3)
+            # One final update
+            pbar.update(donebefore + len(kleedones) + skipped)
+
+        # At this point, all threads must be finished
+        pool.join()
+
+        # Store the klees with error for next runs
+        self.register_passed_klee_runs(kleedones)
+
+        return skipped
+
+    def put_phase_threads_into_pool(self, phase, pool, run, callbacklist):
+        assert(phase == 1 or phase == 2)
+
+        skipped = 0
+
+        # TODO store mapping of KLEE out directory -> function analyzed in dir
+
+        if phase == 1:
+            for function in run:
+                pool.apply_async(thread_phase_one, (
+                    function, self.program_bc, self.bcdir,
+                    self.get_next_klee_directory()
+                ), callback=callbacklist.append)
+            # You cannot skip anything in phase one -> 0 skips
+        elif phase == 2:
+            for (caller, callee) in run:
+                if callee in self.errorkleeruns:
+                    pool.apply_async(thread_phase_two, (
+                        caller, callee, self.errorkleeruns[callee],
+                        self.bcdir, self.get_next_klee_directory()
+                    ), callback=callbacklist.append)
+                else:
+                    skipped += 1
+        return skipped
 
     def register_passed_klee_runs(self, kleedones):
         for k in kleedones:
