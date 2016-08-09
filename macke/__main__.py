@@ -2,6 +2,7 @@
 Start a complete analysis with the MACKE toolchain on a given bitcode file
 """
 import argparse
+from .config import check_config
 from .Macke import Macke
 
 
@@ -23,10 +24,9 @@ def main():
         help="Bitcode file, that will be analyzed"
     )
 
-    args = parser.parse_args()
+    check_config()
 
-    # TODO check config, e.g. KLEE supports targeted search,
-    # opt supports all used passes, programs are installed ...
+    args = parser.parse_args()
 
     m = Macke(args.bcfile.name)
     m.run_complete_analysis()
