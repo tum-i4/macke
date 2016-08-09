@@ -25,6 +25,9 @@ def main():
 
     args = parser.parse_args()
 
+    # TODO check config, e.g. KLEE supports targeted search,
+    # opt supports all used passes, programs are installed ...
+
     m = Macke(args.bcfile.name)
     m.run_complete_analysis()
 

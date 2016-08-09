@@ -19,6 +19,8 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errtotalcount, 0)
         self.assertEqual(m.errfunccount, 0)
 
+        self.assertEqual(m.errorkleeruns, {})
+
     def test_with_one_asserts(self):
         m = self.run_macke_test_on_file("examples/not42.bc")
 
@@ -26,12 +28,17 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errtotalcount, 1)
         self.assertEqual(m.errfunccount, 1)
 
+        self.assertEqual(len(m.errorkleeruns), 1)
+        self.assertEqual(len(m.errorkleeruns['not42']), 1)
+
     def test_main_generates_no_testcases(self):
         m = self.run_macke_test_on_file("examples/main.bc")
 
         self.assertEqual(m.testcases, 0)
         self.assertEqual(m.errtotalcount, 0)
         self.assertEqual(m.errfunccount, 0)
+
+        self.assertEqual(m.errorkleeruns, {})
 
     def test_with_several_asserts(self):
         m = self.run_macke_test_on_file("examples/small.bc")
@@ -41,3 +48,8 @@ class TestMackePhaseOne(unittest.TestCase):
         # 3 for f1, 1 for f2, 2 for f3
         self.assertEqual(m.errtotalcount, 6)
         self.assertEqual(m.errfunccount, 3)
+
+        self.assertEqual(len(m.errorkleeruns), 3)
+        self.assertEqual(len(m.errorkleeruns['f1']), 1)
+        self.assertEqual(len(m.errorkleeruns['f2']), 1)
+        self.assertEqual(len(m.errorkleeruns['f3']), 1)

@@ -36,6 +36,14 @@ class Macke:
         # Internal counter for the number of klee runs
         self.kleecount = 1
 
+        # Initialize some statistic counter
+        self.testcases = 0
+        self.errfunccount = 0
+        self.errtotalcount = 0
+
+        # Map of function -> [kleeruns triggering an error]
+        self.errorkleeruns = {}
+
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
 
@@ -80,6 +88,8 @@ class Macke:
         # Storage for all complete runs
         kleedones = []
 
+        # TODO store mapping of KLEE out directory -> function analyzed in dir
+
         # Dispense the KLEE runs on the workers in the pool
         for function in tasks:
             pool.apply_async(thread_phase_one, (
@@ -99,16 +109,22 @@ class Macke:
                 bar.update(len(kleedones))
         pool.join()
 
-        # fill some counters
-        self.testcases = sum(k.testcount for k in kleedones)
-        self.errfunccount = sum(k.errorcount != 0 for k in kleedones)
-        self.errtotalcount = sum(k.errorcount for k in kleedones)
+        for k in kleedones:
+            # fill some counters
+            self.testcases += k.testcount
+            self.errfunccount += k.errorcount != 0
+            self.errtotalcount += k.errorcount
+
+            # store runs uncovering errors for phase two
+            if k.errorcount != 0:
+                if k.analyzedfunc in self.errorkleeruns:
+                    self.errorkleeruns[k.analyzedfunc].append(k.outdir)
+                else:
+                    self.errorkleeruns[k.analyzedfunc] = [k.outdir]
 
         self.qprint("Phase 1: %d test cases generated. "
                     "Found %d total errors in %d functions" %
                     (self.testcases, self.errtotalcount, self.errfunccount))
-
-        # TODO prepare them for phase two
 
     def run_phase_two(self):
         self.qprint("Phase 2: ... is not working ... yet ^^")
@@ -134,4 +150,4 @@ def thread_phase_one(functionname, program_bc, bcdir, outdir):
 
     # Run KLEE on it
     # TODO add relevant flags
-    return execute_klee(encapsulated_bcfile, outdir, [])
+    return execute_klee(encapsulated_bcfile, functionname, outdir, [])

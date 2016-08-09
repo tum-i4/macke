@@ -9,9 +9,10 @@ from .config import KLEEBIN
 
 class KleeResult:
 
-    def __init__(self, bcfile, outdir, stdoutput, flags=None):
+    def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None):
         # Set all atttributes given by the constructor
         self.bcfile = bcfile
+        self.analyzedfunc = analyzedfunc
         self.outdir = outdir
         self.flags = [] if flags is None else flags
         self.stdoutput = stdoutput
@@ -26,7 +27,7 @@ class KleeResult:
         return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
 
 
-def execute_klee(bcfile, outdir, flags=None):
+def execute_klee(bcfile, analyzedfunc, outdir, flags=None):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
@@ -40,4 +41,4 @@ def execute_klee(bcfile, outdir, flags=None):
         stderr=subprocess.STDOUT).decode("utf-8")
 
     # Return a filled result container
-    return KleeResult(bcfile, outdir, out, flags)
+    return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
