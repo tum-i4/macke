@@ -7,7 +7,8 @@ from os import path
 import subprocess
 
 CONFIG = configparser.ConfigParser()
-CONFIG.read(path.join(path.dirname(__file__), "..", "config.ini"))
+CONFIGFILE = path.join(path.dirname(__file__), "..", "config.ini")
+CONFIG.read(CONFIGFILE)
 
 LIBMACKEOPT = CONFIG.get("binaries", "libmackeopt")
 LLVMOPT = CONFIG.get("binaries", "llvmopt", fallback="opt")

@@ -3,13 +3,14 @@ Main container for all steps of the MACKE analysis
 """
 
 from datetime import datetime
+import json
 from multiprocessing import Pool
 from progressbar import ProgressBar
 from os import makedirs, path
 import shutil
 from time import sleep
 from .CallGraph import CallGraph
-from .config import THREADNUM
+from .config import CONFIGFILE, THREADNUM
 from .Klee import execute_klee, execute_klee_targeted_search
 from .llvm_wrapper import encapsulate_symbolic, prepend_error
 
@@ -31,7 +32,10 @@ class Macke:
         self.bcdir = path.join(self.rundir, "bitcode")
 
         # Generate the filename for the copy of the program
-        self.program_bc = path.join(self.rundir, "program.bc")
+        self.program_bc = path.join(self.bcdir, "program.bc")
+
+        # Generate the directory containing all klee runs
+        self.kleedir = path.join(self.rundir, "klee")
 
         # Internal counter for the number of klee runs
         self.kleecount = 0
@@ -53,7 +57,7 @@ class Macke:
 
     def get_next_klee_directory(self):
         self.kleecount += 1
-        result = path.join(self.rundir, "klee-out-%d" % self.kleecount)
+        result = path.join(self.kleedir, "klee-out-%d" % self.kleecount)
         return result
 
     def run_complete_analysis(self):
@@ -63,15 +67,24 @@ class Macke:
         self.run_finalization()
 
     def run_initialization(self):
-        # Create an empty run directory with empty bitcode directory
+        # Create an some empty directories
         makedirs(self.bcdir)
+        makedirs(self.kleedir)
 
         # Copy the unmodified bitcode file
         shutil.copy2(self.bitcodefile, self.program_bc)
 
-        # TODO copy current git hash of macke
-        # TODO copy config file
-        # TODO add self.bitcodefile information
+        # Copy macke's config file
+        shutil.copy2(CONFIGFILE, self.rundir)
+
+        # Store some basic information about the current run
+        with open(path.join(self.rundir, "info.json"), 'w') as f:
+            info = dict()
+            # TODO add the actual git version tag here
+            info["macke-git-version"] = "123456"
+            info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
+            # TODO add information, how macke was started (flags, params)
+            json.dump(info, f)
 
         # Print some information for the user
         self.qprint(
