@@ -50,6 +50,10 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None):
     # use empty list as default flags
     flags = [] if flags is None else flags
 
+    # --disable-internalize can be removed after, KLEE bug #454 is fixed
+    flags += ["--entry-point", "macke_%s_main" % analyzedfunc,
+              "--disable-internalize"]
+
     # actually run KLEE
     out = subprocess.check_output([
         KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile],

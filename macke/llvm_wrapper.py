@@ -42,8 +42,7 @@ def extract_callgraph(bitcodefile):
         "-disable-output"])
 
 
-def encapsulate_symbolic(
-        sourcefile, function, destfile=None, removeunused=True):
+def encapsulate_symbolic(sourcefile, function, destfile=None):
     """
     Wrapper around the encapsulate symbolic pass
     """
@@ -51,18 +50,10 @@ def encapsulate_symbolic(
     if destfile is None:
         destfile = sourcefile
 
-    additional_passes = []
-    if removeunused:
-        # Add some passes to eliminate all unused functions
-        additional_passes += [
-            "-internalize-public-api-list=main",
-            "-internalize", "-globalopt", "-globaldce", "-adce"]
-
     return __run_subprocess([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-encapsulatesymbolic", sourcefile,
-        "-encapsulatedfunction", function] + additional_passes +
-        ["-o", destfile])
+        "-encapsulatedfunction", function, "-o", destfile])
 
 
 def prepend_error(sourcefile, function, errordirlist, destfile=None):
@@ -81,3 +72,16 @@ def prepend_error(sourcefile, function, errordirlist, destfile=None):
     return __run_subprocess([
         LLVMOPT, "-load", LIBMACKEOPT, "-preprenderror", sourcefile,
         "-prependtofunction", function] + errordirflags + ["-o", destfile])
+
+
+def remove_unreachable_from(entrypoint, sourcefile, destfile=None):
+    """
+    Internalize everything except entrypoint and remove unused code
+    """
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
+
+    return __run_subprocess([
+        LLVMOPT, "-internalize-public-api-list=%s" % entrypoint, sourcefile,
+        "-internalize", "-globalopt", "-globaldce", "-o", destfile])

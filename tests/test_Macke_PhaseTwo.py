@@ -18,13 +18,12 @@ class TestMackePhaseOne(unittest.TestCase):
 
         self.assertEqual(m.errfunccount, 3)
 
-        chains = m.reconstruct_error_chains()
         # All three asserts should be propagated
-        self.assertEqual(len(chains[0]), 2)
-        self.assertEqual(len(chains[1]), 2)
-        self.assertEqual(len(chains[2]), 2)
+        self.assertEqual(len(m.errorchains[0]), 2)
+        self.assertEqual(len(m.errorchains[1]), 2)
+        self.assertEqual(len(m.errorchains[2]), 2)
         # And no other error
-        self.assertEqual(len(chains), 3)
+        self.assertEqual(len(m.errorchains), 3)
 
         # 3 for phase one, 2 in f1 for phase two
         self.assertEqual(len(m.errorkleeruns), 3)
@@ -38,10 +37,9 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errfunccount, 4)
 
         # The longest chain has goes through all functions
-        chains = m.reconstruct_error_chains()
-        self.assertEqual(len(chains[0]), 4)
+        self.assertEqual(len(m.errorchains[0]), 4)
         # Their is only one chain with this length
-        self.assertTrue(len(chains) == 1 or len(chains[1]) < 4)
+        self.assertTrue(len(m.errorchains) == 1 or len(m.errorchains[1]) < 4)
 
         self.assertEqual(len(m.errorkleeruns), 4)
         self.assertEqual(len(m.errorkleeruns['c1']), 2)
