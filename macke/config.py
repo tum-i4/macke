@@ -58,3 +58,9 @@ def check_config():
     # Check, if a reasonable number of threads is used
     if THREADNUM is not None and not 0 < THREADNUM < 128:
         raise Exception("Config: Invalid Number of threads")
+
+
+def get_current_git_hash():
+    return subprocess.check_output(
+        ['git', 'rev-parse', 'HEAD'],
+        cwd=path.join(path.dirname(__file__), "..")).decode("utf-8").rstrip()

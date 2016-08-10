@@ -24,11 +24,23 @@ def main():
         help="Bitcode file, that will be analyzed"
     )
 
+    parser.add_argument(
+        '--comment',
+        nargs='?',
+        default="",
+        help="Additional comment, that will be stored in the output directory")
+
+    parser.add_argument(
+        '--parent-dir',
+        nargs='?',
+        default="/tmp/macke",
+        help="The output directory of the run is put inside this directory")
+
     check_config()
 
     args = parser.parse_args()
 
-    m = Macke(args.bcfile.name)
+    m = Macke(args.bcfile.name, args.comment, parentdir=args.parent_dir)
     m.run_complete_analysis()
 
 if __name__ == "__main__":

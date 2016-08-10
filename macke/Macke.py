@@ -6,27 +6,34 @@ from datetime import datetime
 import json
 from multiprocessing import Pool
 from progressbar import ProgressBar
-from os import makedirs, path
+from os import makedirs, path, symlink, remove
 import shutil
+import sys
 from time import sleep
 from .CallGraph import CallGraph
-from .config import CONFIGFILE, THREADNUM
+from .config import CONFIGFILE, THREADNUM, get_current_git_hash
 from .Klee import execute_klee, execute_klee_targeted_search
 from .llvm_wrapper import encapsulate_symbolic, prepend_error
 
 
 class Macke:
 
-    def __init__(self, bitcodefile, parentdir="/tmp/macke", quiet=False):
+    def __init__(self, bitcodefile, comment="",
+                 parentdir="/tmp/macke", quiet=False):
         # Only accept valid files and directory
         assert(path.isfile(bitcodefile))
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
+        # Store the comment for later
+        self.comment = comment
+
         # generate name of directory with all run results
-        newdirname = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.starttime = datetime.now()
+        newdirname = self.starttime.strftime("%Y-%m-%d-%H-%M-%S")
         self.rundir = path.join(parentdir, newdirname)
+        self.parentdir = parentdir
 
         # Generate the path for the bitcode directory
         self.bcdir = path.join(self.rundir, "bitcode")
@@ -36,6 +43,9 @@ class Macke:
 
         # Generate the directory containing all klee runs
         self.kleedir = path.join(self.rundir, "klee")
+
+        # Filename, where the index of the klee runs is stored
+        self.kleejson = path.join(self.rundir, "klee.json")
 
         # Internal counter for the number of klee runs
         self.kleecount = 0
@@ -55,9 +65,19 @@ class Macke:
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
 
-    def get_next_klee_directory(self):
+    def get_next_klee_directory(self, info):
         self.kleecount += 1
         result = path.join(self.kleedir, "klee-out-%d" % self.kleecount)
+
+        # Add the new file also to the klee index
+        outjson = dict()
+        outjson[result] = info
+        with open(self.kleejson, 'a') as f:
+            # Prepend separator for all but the first entry
+            if self.kleecount != 1:
+                f.write(", ")
+            f.write(json.dumps(outjson)[1:-1])
+
         return result
 
     def run_complete_analysis(self):
@@ -80,11 +100,15 @@ class Macke:
         # Store some basic information about the current run
         with open(path.join(self.rundir, "info.json"), 'w') as f:
             info = dict()
-            # TODO add the actual git version tag here
-            info["macke-git-version"] = "123456"
+            info["macke-git-version-hash"] = get_current_git_hash()
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
-            # TODO add information, how macke was started (flags, params)
+            info["run-argv"] = sys.argv
+            info["comment"] = self.comment
             json.dump(info, f)
+
+        # Initialize a file for klee directory mapping
+        with open(self.kleejson, 'w') as f:
+            f.write("{")
 
         # Print some information for the user
         self.qprint(
@@ -137,25 +161,55 @@ class Macke:
             bar.finish()
 
         # TODO run main if arguments for it are given
+        self.errorchains = self.reconstruct_error_chains()
 
         self.qprint("Phase 2: %d additional KLEE analyses were started" %
                     (qualified - totallyskipped))
         self.qprint("Phase 2: %d error-chains were found through %d "
                     "previously not affected functions" %
-                    (len(self.reconstruct_error_chains()),
+                    (len(self.errorchains),
                      self.errfunccount - olderrfunccount))
 
     def run_finalization(self):
+        self.endtime = datetime.now()
+
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
                     (self.testcases, self.kleecount))
         self.qprint("Summary: %d errors were detected spread over %d "
                     "functions" % (self.errtotalcount, self.errfunccount))
+
+        # Close the json of the klee run index file
+        with open(self.kleejson, 'a') as f:
+            f.write("}")
+
+        # Export all the data gathered so far to a json file
+        with open(path.join(self.rundir, "result.json"), 'w') as f:
+            info = dict()
+
+            info["start"] = self.starttime.isoformat()
+            info["end"] = self.endtime.isoformat()
+            info["testcases"] = self.testcases
+            info["numberOfFunctionsWithErrors"] = self.errfunccount
+            info["totalNumberOfErrors"] = self.errtotalcount
+            info["functionToKleeRunWithErrorMap"] = self.errorkleeruns
+            info["errorchains"] = self.errorchains
+
+            json.dump(info, f)
+
+        # link the current directory as macke-last
+        symlinkname = path.join(self.parentdir, "macke-last")
+        try:
+            remove(symlinkname)
+        except OSError:
+            pass
+        symlink(self.rundir, symlinkname)
 
     def qprint(self, *args, **kwargs):
         if not self.quiet:
             print(*args, **kwargs)
 
     def delete_directory(self):
+        remove(path.join(self.parentdir, "macke-last"))
         shutil.rmtree(self.rundir, ignore_errors=True)
 
     def __execute_in_parallel_threads(self, run, phase, pbar):
@@ -199,13 +253,12 @@ class Macke:
 
         skipped = 0
 
-        # TODO store mapping of KLEE out directory -> function analyzed in dir
-
         if phase == 1:
             for function in run:
                 pool.apply_async(thread_phase_one, (
                     function, self.program_bc, self.bcdir,
-                    self.get_next_klee_directory()
+                    self.get_next_klee_directory(
+                        dict(phase=phase, function=function))
                 ), callback=callbacklist.append)
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
@@ -213,7 +266,8 @@ class Macke:
                 if callee in self.errorkleeruns:
                     pool.apply_async(thread_phase_two, (
                         caller, callee, self.errorkleeruns[callee],
-                        self.bcdir, self.get_next_klee_directory()
+                        self.bcdir, self.get_next_klee_directory(
+                            dict(phase=phase, caller=caller, callee=callee))
                     ), callback=callbacklist.append)
                 else:
                     skipped += 1
