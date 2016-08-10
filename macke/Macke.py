@@ -44,6 +44,10 @@ class Macke:
         # Map of function -> [kleeruns triggering an error]
         self.errorkleeruns = {}
 
+        # Information about the error chains
+        self.errorchains = dict()
+        self.errorchainheads = set()
+
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
 
@@ -123,9 +127,10 @@ class Macke:
 
         self.qprint("Phase 2: %d additional KLEE analyses were started" %
                     (qualified - totallyskipped))
-        self.qprint("Phase 2: errors were propagated to %d previously not "
-                    "affected functions" %
-                    (self.errfunccount - olderrfunccount))
+        self.qprint("Phase 2: %d error-chains were found through %d "
+                    "previously not affected functions" %
+                    (len(self.reconstruct_error_chains()),
+                     self.errfunccount - olderrfunccount))
 
     def run_finalization(self):
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
@@ -221,6 +226,33 @@ class Macke:
                 self.errorkleeruns[k.analyzedfunc].append(k.outdir)
             else:
                 self.errorkleeruns[k.analyzedfunc] = [k.outdir]
+
+        # All new errors are potential heads of error chains
+        for errfile in k.errfiles:
+            self.errorchainheads.add(errfile)
+
+        # store all error chains
+        for new, old in k.chained:
+            self.errorchains[new] = old
+            # the old error is no longer a head
+            if old in self.errorchainheads:
+                self.errorchainheads.remove(old)
+
+    def reconstruct_error_chains(self):
+        result = []
+
+        for head in self.errorchainheads:
+            chain = [head]
+            probe = head
+            while probe in self.errorchains:
+                probe = self.errorchains[probe]
+                chain.append(probe)
+            if len(chain) > 1:
+                result.append(chain)
+
+        # Longest chains are reported first
+        result.sort(key=lambda x: (len(x), x[0]), reverse=True)
+        return result
 
 
 def get_symbolic_encapsulated_bcfile(bcdir, functionname):

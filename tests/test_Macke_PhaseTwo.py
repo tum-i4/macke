@@ -13,14 +13,18 @@ class TestMackePhaseOne(unittest.TestCase):
         m.delete_directory()
         return m
 
-    def test_with_divisible(self):
+    def test_with_small(self):
         m = self.run_macke_test_on_file("examples/small.bc")
 
-        # TODO no idea about the first two numbers, rethink it
-        # after the correct flags were added
-        # self.assertEqual(m.testcases, 21)
-        # self.assertEqual(m.errtotalcount, 13)
         self.assertEqual(m.errfunccount, 3)
+
+        chains = m.reconstruct_error_chains()
+        # All three asserts should be propagated
+        self.assertEqual(len(chains[0]), 2)
+        self.assertEqual(len(chains[1]), 2)
+        self.assertEqual(len(chains[2]), 2)
+        # And no other error
+        self.assertEqual(len(chains), 3)
 
         # 3 for phase one, 2 in f1 for phase two
         self.assertEqual(len(m.errorkleeruns), 3)
@@ -31,11 +35,13 @@ class TestMackePhaseOne(unittest.TestCase):
     def test_with_chain(self):
         m = self.run_macke_test_on_file("examples/chain.bc")
 
-        # TODO no idea about the first two numbers, rethink it
-        # after the correct flags were added
-        # self.assertEqual(m.testcases, 23)
-        # self.assertEqual(m.errtotalcount, 16)
         self.assertEqual(m.errfunccount, 4)
+
+        # The longest chain has goes through all functions
+        chains = m.reconstruct_error_chains()
+        self.assertEqual(len(chains[0]), 4)
+        # Their is only one chain with this length
+        self.assertTrue(len(chains) == 1 or len(chains[1]) < 4)
 
         self.assertEqual(len(m.errorkleeruns), 4)
         self.assertEqual(len(m.errorkleeruns['c1']), 2)
