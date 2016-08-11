@@ -135,7 +135,8 @@ class Macke:
 
         # Generate one bcfile with symbolic encapsulations for each function
         for functionname in tasks:
-            encapsulate_symbolic(self.symmains_bc, functionname)
+            if functionname != "main":
+                encapsulate_symbolic(self.symmains_bc, functionname)
 
         bar = ProgressBar(max_value=len(tasks)) if not self.quiet else None
         self.__execute_in_parallel_threads(tasks, 1, bar)
@@ -181,6 +182,7 @@ class Macke:
                     "previously not affected functions" %
                     (len(self.errorchains),
                      self.errfunccount - olderrfunccount))
+        # TODO add number of chains from main
 
     def run_finalization(self):
         self.endtime = datetime.now()
@@ -264,17 +266,13 @@ class Macke:
 
         skipped = 0
 
-        # TODO add relevant flags
-        flags = []
-        flags.extend(self.flags_user)
-
         if phase == 1:
             for function in run:
                 pool.apply_async(thread_phase_one, (
                     function, self.symmains_bc, self.bcdir,
                     self.get_next_klee_directory(
                         dict(phase=phase, function=function)),
-                    flags, self.flags4main
+                    self.flags_user, self.flags4main
                 ), callback=callbacklist.append)
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
@@ -285,7 +283,7 @@ class Macke:
                         self.errorkleeruns[callee], self.bcdir,
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
-                        flags, self.flags4main
+                        self.flags_user, self.flags4main
                     ), callback=callbacklist.append)
                 else:
                     skipped += 1
@@ -366,7 +364,8 @@ def thread_phase_two(caller, callee, symmains_bc, errordirlist, bcdir,
     prepend_error(symmains_bc, callee, errordirlist, prepended_bc)
 
     # And remove all code, that is unreachable during analysis
-    remove_unreachable_from("macke_%s_main" % caller, prepended_bc)
+    entrypoint = "macke_%s_main" % caller if caller != "main" else "main"
+    remove_unreachable_from(entrypoint, prepended_bc)
 
     # And run klee on it
     return execute_klee_targeted_search(

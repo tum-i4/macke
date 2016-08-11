@@ -7,7 +7,18 @@ import re
 import subprocess
 from .config import KLEEBIN
 
-KLEEFLAGS = ["--libc=uclibc", "--posix-runtime"]
+KLEEFLAGS = [
+    "--allow-external-sym-calls",
+    "--emit-all-errors",
+    "--libc=uclibc",
+    "--max-memory=1000",
+    "--only-output-states-covering-new",
+    "--optimize",
+    "--output-source=false",
+    "--posix-runtime",
+    "--watchdog",
+    "--write-cov"
+]
 
 
 class KleeResult:
@@ -60,15 +71,21 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
                   "--disable-internalize"]
 
         # actually run KLEE
-        out = subprocess.check_output([
-            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile],
-            stderr=subprocess.STDOUT).decode("utf-8")
+        command = [KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile]
     else:
         # the main function is handled a little bit differently
         # Strange, but the flags passed to main must be append after bcfile
-        out = subprocess.check_output([
-            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile] + flags4main,
-            stderr=subprocess.STDOUT).decode("utf-8")
+        command = [
+            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile] + flags4main
+
+    try:
+        out = subprocess.check_output(command,
+                                      stderr=subprocess.STDOUT).decode("utf-8")
+    except subprocess.CalledProcessError as e:
+        # If something went wrong, throw the error to the command line
+        print("Error during:", command)
+        out = e.output.decode("utf-8")
+        print(out)
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
@@ -78,6 +95,8 @@ def execute_klee_targeted_search(
         bcfile, analyzedfunc, targetfunc, outdir, flags=None, flags4main=None):
     # use empty list as default flags
     flags = [] if flags is None else flags
-    # TODO add -max-depth= to stop targeted search on target
-    flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
+    flags = ["--search=ld2t", "--targeted-function=" + targetfunc,
+             # Some kind of hacky but -max-depth= stops targeted search
+             # if target not reachable from current state
+             "-max-depth=1000000"] + flags
     return execute_klee(bcfile, analyzedfunc, outdir, flags, flags4main)

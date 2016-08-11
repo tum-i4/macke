@@ -85,8 +85,6 @@ def main():
         flags4main.append("--sym-files")
         flags4main.extend(args.sym_files)
 
-    print(flags4main)
-
     # And finally pass everything to MACKE
     m = Macke(args.bcfile.name, args.comment, args.parent_dir,
               False, flags_user, flags4main)

@@ -6,7 +6,7 @@ from macke.Macke import Macke
 class TestMackePhaseOne(unittest.TestCase):
 
     def run_macke_test_on_file(self, bcfile):
-        m = Macke(bcfile, quiet=True)
+        m = Macke(bcfile, quiet=True, flags_user=["--max-time=60"])
         m.run_initialization()
         m.run_phase_one()
         m.delete_directory()
