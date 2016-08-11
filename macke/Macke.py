@@ -20,15 +20,18 @@ from .llvm_wrapper import (
 class Macke:
 
     def __init__(self, bitcodefile, comment="",
-                 parentdir="/tmp/macke", quiet=False):
+                 parentdir="/tmp/macke", quiet=False,
+                 flags_user=None, flags4main=None):
         # Only accept valid files and directory
         assert(path.isfile(bitcodefile))
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
-        # Store the comment for later
+        # Store information from command line
         self.comment = comment
+        self.flags_user = flags_user if flags_user is not None else []
+        self.flags4main = flags4main if flags4main is not None else []
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
@@ -121,7 +124,8 @@ class Macke:
         self.callgraph = CallGraph(self.bitcodefile)
 
         # Fill a list of functions for the symbolic encapsulation
-        tasks = self.callgraph.get_candidates_for_symbolic_encapsulation()
+        tasks = self.callgraph.get_candidates_for_symbolic_encapsulation(
+            removemain=not bool(self.flags4main))
 
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
@@ -144,7 +148,8 @@ class Macke:
 
     def run_phase_two(self):
         # Get (caller,callee)-pairs grouped in serialized runs
-        runs = self.callgraph.get_grouped_edges_for_call_chain_propagation()
+        runs = self.callgraph.get_grouped_edges_for_call_chain_propagation(
+            removemain=not bool(self.flags4main))
 
         # Store old counter to calculate progress in phase two
         olderrfunccount = self.errfunccount
@@ -154,7 +159,6 @@ class Macke:
         total = sum(len(value["calls"])
                     for key, value in self.callgraph.graph.items()
                     if key != "null function")
-        # TODO count also calls from main if flag is given
 
         self.qprint("Phase 2: %d of %d calls are suitable for error chain "
                     "propagation" % (qualified, total))
@@ -169,7 +173,6 @@ class Macke:
         if not self.quiet:
             bar.finish()
 
-        # TODO run main if arguments for it are given
         self.errorchains = self.reconstruct_error_chains()
 
         self.qprint("Phase 2: %d additional KLEE analyses were started" %
@@ -261,12 +264,17 @@ class Macke:
 
         skipped = 0
 
+        # TODO add relevant flags
+        flags = []
+        flags.extend(self.flags_user)
+
         if phase == 1:
             for function in run:
                 pool.apply_async(thread_phase_one, (
                     function, self.symmains_bc, self.bcdir,
                     self.get_next_klee_directory(
-                        dict(phase=phase, function=function))
+                        dict(phase=phase, function=function)),
+                    flags, self.flags4main
                 ), callback=callbacklist.append)
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
@@ -276,7 +284,8 @@ class Macke:
                         caller, callee, self.symmains_bc,
                         self.errorkleeruns[callee], self.bcdir,
                         self.get_next_klee_directory(
-                            dict(phase=phase, caller=caller, callee=callee))
+                            dict(phase=phase, caller=caller, callee=callee)),
+                        flags, self.flags4main
                     ), callback=callbacklist.append)
                 else:
                     skipped += 1
@@ -336,16 +345,17 @@ def get_error_chain_bcfile(bcdir, caller, callee):
     return path.join(bcdir, "chain-%s-%s.bc" % (caller, callee))
 
 
-def thread_phase_one(functionname, symmains_bc, bcdir, outdir):
+def thread_phase_one(
+        functionname, symmains_bc, bcdir, outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase one
     """
     # Just run KLEE on it
-    # TODO add relevant flags
-    return execute_klee(symmains_bc, functionname, outdir, [])
+    return execute_klee(symmains_bc, functionname, outdir, flags, flags4main)
 
 
-def thread_phase_two(caller, callee, symmains_bc, errordirlist, bcdir, outdir):
+def thread_phase_two(caller, callee, symmains_bc, errordirlist, bcdir,
+                     outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase two
     """
@@ -359,5 +369,5 @@ def thread_phase_two(caller, callee, symmains_bc, errordirlist, bcdir, outdir):
     remove_unreachable_from("macke_%s_main" % caller, prepended_bc)
 
     # And run klee on it
-    # TODO add relevant flags
-    return execute_klee_targeted_search(prepended_bc, caller, callee, outdir)
+    return execute_klee_targeted_search(
+        prepended_bc, caller, callee, outdir, flags, flags4main)

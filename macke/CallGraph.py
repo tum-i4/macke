@@ -23,7 +23,7 @@ class CallGraph:
     def __getitem__(self, key):
         return self.graph[key]
 
-    def get_candidates_for_symbolic_encapsulation(self):
+    def get_candidates_for_symbolic_encapsulation(self, removemain=True):
         """
         Returns a sort of inverted topologically ordered list of all function
         names, that can be symbolically encapsulated by MACKE
@@ -37,9 +37,10 @@ class CallGraph:
             else:
                 flattened.extend(t)
 
-        return [t for t in flattened if not self[t]['hasdoubleptrarg']]
+        return [t for t in flattened if (not self[t]['hasdoubleptrarg'] or (
+            not removemain and t == "main"))]
 
-    def get_grouped_edges_for_call_chain_propagation(self):
+    def get_grouped_edges_for_call_chain_propagation(self, removemain=True):
         """
         Returns a topologically ordered list of (caller, callee)-tuples
         nested in sublists, that can be analyzed in parallel processes
@@ -90,9 +91,10 @@ class CallGraph:
             ps = []
             for callee in u:
                 for caller in self[callee]['calledby']:
-                    if (not self[caller]['hasdoubleptrarg'] and
+                    if ((not removemain and caller == "main") or
+                        (not self[caller]['hasdoubleptrarg'] and
                             not self[caller]['isexternal'] and
-                            not self[callee]['isexternal']):
+                            not self[callee]['isexternal'])):
                         ps.append((caller, callee))
             if ps:
                 result.append(sorted(ps))

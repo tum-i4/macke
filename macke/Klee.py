@@ -7,6 +7,8 @@ import re
 import subprocess
 from .config import KLEEBIN
 
+KLEEFLAGS = ["--libc=uclibc", "--posix-runtime"]
+
 
 class KleeResult:
 
@@ -42,30 +44,40 @@ class KleeResult:
         return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
 
 
-def execute_klee(bcfile, analyzedfunc, outdir, flags=None):
+def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
 
     # use empty list as default flags
     flags = [] if flags is None else flags
+    flags4main = [] if flags4main is None else flags4main
+    flags.extend(KLEEFLAGS)
 
-    # --disable-internalize can be removed after, KLEE bug #454 is fixed
-    flags += ["--entry-point", "macke_%s_main" % analyzedfunc,
-              "--disable-internalize"]
+    if analyzedfunc != "main":
+        # --disable-internalize can be removed after, KLEE bug #454 is fixed
+        flags += ["--entry-point", "macke_%s_main" % analyzedfunc,
+                  "--disable-internalize"]
 
-    # actually run KLEE
-    out = subprocess.check_output([
-        KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile],
-        stderr=subprocess.STDOUT).decode("utf-8")
+        # actually run KLEE
+        out = subprocess.check_output([
+            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile],
+            stderr=subprocess.STDOUT).decode("utf-8")
+    else:
+        # the main function is handled a little bit differently
+        # Strange, but the flags passed to main must be append after bcfile
+        out = subprocess.check_output([
+            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile] + flags4main,
+            stderr=subprocess.STDOUT).decode("utf-8")
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
 
 
 def execute_klee_targeted_search(
-        bcfile, analyzedfunc, targetfunc, outdir, flags=None):
+        bcfile, analyzedfunc, targetfunc, outdir, flags=None, flags4main=None):
     # use empty list as default flags
     flags = [] if flags is None else flags
+    # TODO add -max-depth= to stop targeted search on target
     flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
-    return execute_klee(bcfile, analyzedfunc, outdir, flags)
+    return execute_klee(bcfile, analyzedfunc, outdir, flags, flags4main)
