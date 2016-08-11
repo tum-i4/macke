@@ -19,7 +19,8 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errtotalcount, 0)
         self.assertEqual(m.errfunccount, 0)
 
-        self.assertEqual(m.errorkleeruns, {})
+        # All entries in the map should be empty
+        self.assertEqual(sum(len(v) for _, v in m.errorkleeruns.items()), 0)
 
     def test_with_one_asserts(self):
         m = self.run_macke_test_on_file("examples/not42.bc")

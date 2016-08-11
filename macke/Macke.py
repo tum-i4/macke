@@ -175,6 +175,9 @@ class Macke:
             bar.finish()
 
         self.errorchains = self.reconstruct_error_chains()
+        self.chainsfrommain = (sum(1 for c in self.errorchains if (
+            len(c) > 1 and path.dirname(c[0]) in self.errorkleeruns['main']))
+            if 'main' in self.errorkleeruns else 0)
 
         self.qprint("Phase 2: %d additional KLEE analyses were started" %
                     (qualified - totallyskipped))
@@ -182,7 +185,7 @@ class Macke:
                     "previously not affected functions" %
                     (len(self.errorchains),
                      self.errfunccount - olderrfunccount))
-        # TODO add number of chains from main
+        self.qprint("Phase 2: %d chains start in main" % self.chainsfrommain)
 
     def run_finalization(self):
         self.endtime = datetime.now()
@@ -207,6 +210,7 @@ class Macke:
             info["totalNumberOfErrors"] = self.errtotalcount
             info["functionToKleeRunWithErrorMap"] = self.errorkleeruns
             info["errorchains"] = self.errorchains
+            info["chainsfrommain"] = self.chainsfrommain
 
             json.dump(info, f)
 
@@ -303,12 +307,13 @@ class Macke:
             k.errorcount != 0 and k.analyzedfunc not in self.errorkleeruns)
         self.errtotalcount += k.errorcount
 
+        # Create an empty entry, if function is not inside the map
+        if k.analyzedfunc not in self.errorkleeruns:
+            self.errorkleeruns[k.analyzedfunc] = []
+
         # store runs uncovering errors for phase two
         if k.errorcount != 0:
-            if k.analyzedfunc in self.errorkleeruns:
-                self.errorkleeruns[k.analyzedfunc].append(k.outdir)
-            else:
-                self.errorkleeruns[k.analyzedfunc] = [k.outdir]
+            self.errorkleeruns[k.analyzedfunc].append(k.outdir)
 
         # All new errors are potential heads of error chains
         for errfile in k.errfiles:

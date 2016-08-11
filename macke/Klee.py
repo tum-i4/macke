@@ -9,15 +9,13 @@ from .config import KLEEBIN
 
 KLEEFLAGS = [
     "--allow-external-sym-calls",
-    "--emit-all-errors",
     "--libc=uclibc",
     "--max-memory=1000",
     "--only-output-states-covering-new",
     "--optimize",
     "--output-source=false",
     "--posix-runtime",
-    "--watchdog",
-    "--write-cov"
+    "--watchdog"
 ]
 
 
