@@ -1,16 +1,17 @@
 """
-Main container for all steps of the MACKE analysis
+Core class for MACKE execution.
+Contains methods for both phases and some analysis
 """
 
 from collections import OrderedDict
 from datetime import datetime
 import json
 from multiprocessing import Pool
-from progressbar import ProgressBar
 from os import makedirs, path, symlink, remove
 import shutil
 import sys
 from time import sleep
+from progressbar import ProgressBar
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
 from .Klee import execute_klee, execute_klee_targeted_search
@@ -19,12 +20,15 @@ from .llvm_wrapper import (
 
 
 class Macke:
+    """
+    Main container for all steps of the MACKE analysis
+    """
 
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, flags4main=None):
         # Only accept valid files and directory
-        assert(path.isfile(bitcodefile))
+        assert path.isfile(bitcodefile)
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
@@ -68,10 +72,21 @@ class Macke:
         self.errorchains = dict()
         self.errorchainheads = set()
 
+        # Some attributes, that are filled later
+        self.callgraph = None
+        self.chainsfrommain = 0
+        self.endtime = None
+
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
 
     def get_next_klee_directory(self, info):
+        """
+        Get the name for the next KLEE output directory and register the name
+        with the given info for klee.json. KLEE cannot generate this names on
+        his own, because multiple instances are executed in parallel.
+        """
+
         self.kleecount += 1
         result = path.join(self.kleedir, "klee-out-%d" % self.kleecount)
 
@@ -87,12 +102,20 @@ class Macke:
         return result
 
     def run_complete_analysis(self):
+        """
+        Run all consecutive steps of the analysis
+        """
+
         self.run_initialization()
         self.run_phase_one()
         self.run_phase_two()
         self.run_finalization()
 
     def run_initialization(self):
+        """
+        Initialize the MACKE output directory
+        """
+
         # Create an some empty directories
         makedirs(self.bcdir)
         makedirs(self.kleedir)
@@ -121,11 +144,16 @@ class Macke:
             "Start analysis of %s in %s" % (self.bitcodefile, self.rundir))
 
     def run_phase_one(self):
+        """
+        Encapsulate all functions symbolically and for each of them
+        start a parallel KLEE run.
+        """
+
         # Generate a call graph
         self.callgraph = CallGraph(self.bitcodefile)
 
         # Fill a list of functions for the symbolic encapsulation
-        tasks = self.callgraph.get_candidates_for_symbolic_encapsulation(
+        tasks = self.callgraph.list_symbolic_encapsulable(
             removemain=not bool(self.flags4main))
 
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
@@ -149,8 +177,13 @@ class Macke:
                     (self.errtotalcount, self.errfunccount))
 
     def run_phase_two(self):
+        """
+        Prepend errors from phase one to all functions and analyze with KLEE
+        again, but this time with targeted search for the function calls.
+        """
+
         # Get (caller,callee)-pairs grouped in serialized runs
-        runs = self.callgraph.get_grouped_edges_for_call_chain_propagation(
+        runs = self.callgraph.group_independent_calls(
             removemain=not bool(self.flags4main))
 
         # Store old counter to calculate progress in phase two
@@ -189,6 +222,9 @@ class Macke:
         self.qprint("Phase 2: %d chains start in main" % self.chainsfrommain)
 
     def run_finalization(self):
+        """
+        Print a summary and write the result to the MACKE directory
+        """
         self.endtime = datetime.now()
 
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
@@ -224,14 +260,24 @@ class Macke:
         symlink(self.rundir, symlinkname)
 
     def qprint(self, *args, **kwargs):
+        """
+        Call pythons print, if MACKE is not set to be quiet
+        """
         if not self.quiet:
             print(*args, **kwargs)
 
     def delete_directory(self):
+        """
+        Delete the directory of the current run
+        """
         shutil.rmtree(self.rundir, ignore_errors=True)
 
     def __execute_in_parallel_threads(self, run, phase, pbar):
-        assert(phase == 1 or phase == 2)
+        """
+        Wrapper for executing a given list of runs with a parallel thread pool
+        """
+
+        assert phase == 1 or phase == 2
 
         if not self.quiet:
             # Store the state of the progressbar before running anything
@@ -267,14 +313,18 @@ class Macke:
         return skipped
 
     def __put_phase_threads_into_pool(self, phase, pool, run, callbacklist):
-        assert(phase == 1 or phase == 2)
+        """
+        Store a given run for one phase with the required arguments
+        into the thread pool
+        """
+        assert phase == 1 or phase == 2
 
         skipped = 0
 
         if phase == 1:
             for function in run:
                 pool.apply_async(thread_phase_one, (
-                    function, self.symmains_bc, self.bcdir,
+                    function, self.symmains_bc,
                     self.get_next_klee_directory(
                         dict(phase=phase, function=function)),
                     self.flags_user, self.flags4main
@@ -295,10 +345,16 @@ class Macke:
         return skipped
 
     def register_passed_klee_runs(self, kleedones):
+        """
+        Extract and register the results of completed KLEE runs
+        """
         for k in kleedones:
             self.register_passed_klee_run(k)
 
     def register_passed_klee_run(self, kleedone):
+        """
+        Extract and register the results of a completed KLEE run
+        """
         # Just give it a shorter name
         k = kleedone
 
@@ -328,6 +384,9 @@ class Macke:
                 self.errorchainheads.remove(old)
 
     def reconstruct_error_chains(self):
+        """
+        Unfold the compact internal representation to a list of error chains
+        """
         result = []
 
         for head in self.errorchainheads:
@@ -345,12 +404,14 @@ class Macke:
 
 
 def get_error_chain_bcfile(bcdir, caller, callee):
+    """
+    Build the path and name of a bc-file with prepended errors of callee
+    """
     # "-" is a good separator, because "-" is not allowed in c function names
     return path.join(bcdir, "chain-%s-%s.bc" % (caller, callee))
 
 
-def thread_phase_one(
-        functionname, symmains_bc, bcdir, outdir, flags, flags4main):
+def thread_phase_one(functionname, symmains_bc, outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase one
     """

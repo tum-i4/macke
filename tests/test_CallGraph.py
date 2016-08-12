@@ -7,7 +7,7 @@ class TestCallGraph(unittest.TestCase):
 
     def test_candidates_for_symbolic_encapsulation_simple(self):
         bcfile = "./examples/divisible.bc"
-        c = CallGraph(bcfile).get_candidates_for_symbolic_encapsulation()
+        c = CallGraph(bcfile).list_symbolic_encapsulable()
 
         self.assertEqual(len(c), 6)
 
@@ -19,19 +19,19 @@ class TestCallGraph(unittest.TestCase):
 
     def test_candidates_for_symbolic_encapsulation_circle(self):
         bcfile = "./examples/doomcircle.bc"
-        c = CallGraph(bcfile).get_candidates_for_symbolic_encapsulation()
+        c = CallGraph(bcfile).list_symbolic_encapsulable()
         self.assertEqual(c, ['a', 'b', 'c'])
 
     def test_candidates_for_symbolic_encapsulation_small(self):
         bcfile = "./examples/small.bc"
-        c = CallGraph(bcfile).get_candidates_for_symbolic_encapsulation()
+        c = CallGraph(bcfile).list_symbolic_encapsulable()
         self.assertEqual(len(c), 3)
         self.assertTrue(c.index("f2") < c.index("f1"))
         self.assertTrue(c.index("f3") < c.index("f1"))
 
     def test_edges_for_call_chain_propagation_divisible(self):
         bcfile = "./examples/divisible.bc"
-        c = CallGraph(bcfile).get_grouped_edges_for_call_chain_propagation()
+        c = CallGraph(bcfile).group_independent_calls()
 
         self.assertEqual(6, len([pair for run in c for pair in run]))
 
@@ -44,12 +44,12 @@ class TestCallGraph(unittest.TestCase):
 
     def test_edges_for_call_chain_propagation_circle(self):
         bcfile = "./examples/doomcircle.bc"
-        c = CallGraph(bcfile).get_grouped_edges_for_call_chain_propagation()
+        c = CallGraph(bcfile).group_independent_calls()
 
         self.assertEqual(c, [[('c', 'a')], [('a', 'b')], [('b', 'c')]])
 
     def test_edges_for_call_chain_propagation_small(self):
         bcfile = "./examples/small.bc"
-        c = CallGraph(bcfile).get_grouped_edges_for_call_chain_propagation()
+        c = CallGraph(bcfile).group_independent_calls()
 
         self.assertEqual(c, [[('f1', 'f2'), ('f1', 'f3')]])

@@ -1,9 +1,9 @@
 """
 Functions, that wraps all llvm actions and transformation into python functions
 """
-from .config import LLVMOPT, LIBMACKEOPT
 import json
 import subprocess
+from .config import LLVMOPT, LIBMACKEOPT
 
 
 def __run_subprocess(popenargs):
@@ -13,7 +13,7 @@ def __run_subprocess(popenargs):
     return subprocess.check_output(popenargs)
 
 
-def __run_subprocess_with_json_output(popenargs):
+def __run_subprocess_json_output(popenargs):
     """
     Starts a subprocess with popenargs and returns the output as parsed json
     """
@@ -26,7 +26,7 @@ def list_all_funcs_topological(bitcodefile):
     Wrapper around the list all functions pass. Any circles or strongly
     connected components are listed alphabetically in nested lists
     """
-    return __run_subprocess_with_json_output([
+    return __run_subprocess_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-listallfuncstopologic", bitcodefile,
         "-disable-output"])
@@ -36,7 +36,7 @@ def extract_callgraph(bitcodefile):
     """
     Wrapper around the extract callgraph pass
     """
-    return __run_subprocess_with_json_output([
+    return __run_subprocess_json_output([
         LLVMOPT, "-load", LIBMACKEOPT,
         "-extractcallgraph", bitcodefile,
         "-disable-output"])

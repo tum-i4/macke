@@ -86,9 +86,9 @@ def main():
         flags4main.extend(args.sym_files)
 
     # And finally pass everything to MACKE
-    m = Macke(args.bcfile.name, args.comment, args.parent_dir,
-              False, flags_user, flags4main)
-    m.run_complete_analysis()
+    macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
+                  False, flags_user, flags4main)
+    macke.run_complete_analysis()
 
 if __name__ == "__main__":
     main()

@@ -17,6 +17,10 @@ THREADNUM = CONFIG.getint("runtime", "threadnum", fallback=None)
 
 
 def __get_output_from(*args, **kwargs):
+    """
+    Starts a subprocess with the given args and returns its output - no matter
+    if the process exits normally or with an error
+    """
     # Sadly, some programs return their help pages with non-zero exit code
     try:
         output = subprocess.check_output(*args, **kwargs)
@@ -26,6 +30,11 @@ def __get_output_from(*args, **kwargs):
 
 
 def check_config():
+    """
+    Checks all variables in the config. Especially if all given binaries are
+    actually executable, have the correct version and support everything needed
+    """
+
     # Check, if LLVMOPT is actually a binary of opt
     if (not path.isfile(LLVMOPT) or b"llvm .bc -> .bc modular optimizer"
             not in __get_output_from([LLVMOPT, "-help"])):
@@ -61,6 +70,9 @@ def check_config():
 
 
 def get_current_git_hash():
+    """
+    Returns the git hash of the currently checked out commit
+    """
     return subprocess.check_output(
         ['git', 'rev-parse', 'HEAD'],
         cwd=path.join(path.dirname(__file__), "..")).decode("utf-8").rstrip()

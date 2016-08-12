@@ -1,5 +1,5 @@
 """
-Container, that store all information about a klee run
+All interactions with KLEE
 """
 
 from os import listdir, path
@@ -20,6 +20,9 @@ KLEEFLAGS = [
 
 
 class KleeResult:
+    """
+    Container, that store all information about a klee run
+    """
 
     def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None):
         # Set all atttributes given by the constructor
@@ -32,22 +35,23 @@ class KleeResult:
         # Calculate some statistics
         self.errorcount = self.stdoutput.count("KLEE: ERROR:")
 
-        m = re.search(r"KLEE: done: generated tests = (\d+)", self.stdoutput)
-        self.testcount = int(m.group(1)) if m else 0
+        match = re.search(
+            r"KLEE: done: generated tests = (\d+)", self.stdoutput)
+        self.testcount = int(match.group(1)) if match else 0
 
         # Grap all the error files
-        self.errfiles = [path.join(self.outdir, f)
-                         for f in listdir(self.outdir)
-                         if f.endswith(".err")]
+        self.errfiles = [path.join(self.outdir, file)
+                         for file in listdir(self.outdir)
+                         if file.endswith(".err")]
 
         # Search for error chains [(new, old)]
         self.chained = []
         for errfile in self.errfiles:
             if errfile.endswith(".macke.err"):
                 with open(errfile, 'r') as f:
-                    m = re.search(r"ERROR FROM (.+\.err)\n", f.readline())
-                if m:
-                    self.chained.append((errfile, m.group(1)))
+                    match = re.search(r"ERROR FROM (.+\.err)\n", f.readline())
+                if match:
+                    self.chained.append((errfile, match.group(1)))
 
     def __str__(self):
         return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
@@ -79,10 +83,10 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
     try:
         out = subprocess.check_output(command,
                                       stderr=subprocess.STDOUT).decode("utf-8")
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError as cperr:
         # If something went wrong, throw the error to the command line
         print("Error during:", command)
-        out = e.output.decode("utf-8")
+        out = cperr.output.decode("utf-8")
         print(out)
 
     # Return a filled result container
@@ -91,6 +95,10 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
 
 def execute_klee_targeted_search(
         bcfile, analyzedfunc, targetfunc, outdir, flags=None, flags4main=None):
+    """
+    Execute KLEE on a bitcode file with targeted search for targetfunc
+    """
+
     # use empty list as default flags
     flags = [] if flags is None else flags
     flags = ["--search=ld2t", "--targeted-function=" + targetfunc,
