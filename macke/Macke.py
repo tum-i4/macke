@@ -2,6 +2,7 @@
 Main container for all steps of the MACKE analysis
 """
 
+from collections import OrderedDict
 from datetime import datetime
 import json
 from multiprocessing import Pool
@@ -104,7 +105,7 @@ class Macke:
 
         # Store some basic information about the current run
         with open(path.join(self.rundir, "info.json"), 'w') as f:
-            info = dict()
+            info = OrderedDict()
             info["macke-git-version-hash"] = get_current_git_hash()
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
             info["run-argv"] = sys.argv
@@ -201,7 +202,7 @@ class Macke:
 
         # Export all the data gathered so far to a json file
         with open(path.join(self.rundir, "result.json"), 'w') as f:
-            info = dict()
+            info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
             info["end"] = self.endtime.isoformat()
