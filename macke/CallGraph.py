@@ -53,7 +53,7 @@ class CallGraph:
         # considering the number parallel executable pairs. But I don't
         # know a better algorithm to generate them. Maybe later ...
 
-        units = self.group_independent_functions()
+        units = self.group_independent_callees()
 
         # Convert the unit list of functions to a list of callers
         result = []
@@ -80,7 +80,7 @@ class CallGraph:
 
         return result
 
-    def group_independent_functions(self):
+    def group_independent_callees(self):
         """
         Group the topological ordered function list in independent units
         """

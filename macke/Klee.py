@@ -13,6 +13,7 @@ KLEEFLAGS = [
     "--max-memory=1000",
     "--only-output-states-covering-new",
     "--optimize",
+    # "--output-module",  # Helpful for debugging, but wasteful normally
     "--output-source=false",
     "--posix-runtime",
     "--watchdog"

@@ -15,8 +15,7 @@ from progressbar import ProgressBar
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
 from .Klee import execute_klee, execute_klee_targeted_search
-from .llvm_wrapper import (
-    encapsulate_symbolic, prepend_error, remove_unreachable_from)
+from .llvm_wrapper import encapsulate_symbolic, prepend_error
 
 
 class Macke:
@@ -202,6 +201,12 @@ class Macke:
         bar = ProgressBar(max_value=qualified) if not self.quiet else None
 
         for run in runs:
+            callees = set({callee for _, callee in run})
+            for callee in callees:
+                prepend_error(
+                    self.symmains_bc, callee, self.errorkleeruns[callee],
+                    get_prepended_bcname(self.bcdir, callee))
+
             # all pairs inside a run can be executed in parallel
             totallyskipped += self.__execute_in_parallel_threads(run, 2, bar)
 
@@ -334,8 +339,8 @@ class Macke:
             for (caller, callee) in run:
                 if callee in self.errorkleeruns:
                     pool.apply_async(thread_phase_two, (
-                        caller, callee, self.symmains_bc,
-                        self.errorkleeruns[callee], self.bcdir,
+                        caller, callee,
+                        get_prepended_bcname(self.bcdir, callee),
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
                         self.flags_user, self.flags4main
@@ -403,12 +408,12 @@ class Macke:
         return result
 
 
-def get_error_chain_bcfile(bcdir, caller, callee):
+def get_prepended_bcname(bcdir, callee):
     """
     Build the path and name of a bc-file with prepended errors of callee
     """
     # "-" is a good separator, because "-" is not allowed in c function names
-    return path.join(bcdir, "chain-%s-%s.bc" % (caller, callee))
+    return path.join(bcdir, "prepended-%s.bc" % callee)
 
 
 def thread_phase_one(functionname, symmains_bc, outdir, flags, flags4main):
@@ -419,21 +424,10 @@ def thread_phase_one(functionname, symmains_bc, outdir, flags, flags4main):
     return execute_klee(symmains_bc, functionname, outdir, flags, flags4main)
 
 
-def thread_phase_two(caller, callee, symmains_bc, errordirlist, bcdir,
-                     outdir, flags, flags4main):
+def thread_phase_two(caller, callee, prepended_bc, outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase two
     """
-    # Generate required file name
-    prepended_bc = get_error_chain_bcfile(bcdir, caller, callee)
-
-    # Prepend the error summaries
-    prepend_error(symmains_bc, callee, errordirlist, prepended_bc)
-
-    # And remove all code, that is unreachable during analysis
-    entrypoint = "macke_%s_main" % caller if caller != "main" else "main"
-    remove_unreachable_from(entrypoint, prepended_bc)
-
     # And run klee on it
     return execute_klee_targeted_search(
         prepended_bc, caller, callee, outdir, flags, flags4main)
