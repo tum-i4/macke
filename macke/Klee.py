@@ -9,12 +9,13 @@ from .config import KLEEBIN
 
 KLEEFLAGS = [
     "--allow-external-sym-calls",
+    "--disable-inlining",  # TODO, this should be done in the prepend llvm pass
     "--libc=uclibc",
     "--max-memory=1000",
     "--only-output-states-covering-new",
     "--optimize",
-    # "--output-module",  # Helpful for debugging, but wasteful normally
-    "--output-source=false",
+    # "--output-module",  # Helpful for debugging
+    # "--output-source=false",  # Removing this is helpful for debugging
     "--posix-runtime",
     "--watchdog"
 ]
@@ -69,9 +70,7 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
     flags.extend(KLEEFLAGS)
 
     if analyzedfunc != "main":
-        # --disable-internalize can be removed after, KLEE bug #454 is fixed
-        flags += ["--entry-point", "macke_%s_main" % analyzedfunc,
-                  "--disable-internalize"]
+        flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
         # actually run KLEE
         command = [KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile]
@@ -102,8 +101,5 @@ def execute_klee_targeted_search(
 
     # use empty list as default flags
     flags = [] if flags is None else flags
-    flags = ["--search=ld2t", "--targeted-function=" + targetfunc,
-             # Some kind of hacky but -max-depth= stops targeted search
-             # if target not reachable from current state
-             "-max-depth=1000000"] + flags
+    flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
     return execute_klee(bcfile, analyzedfunc, outdir, flags, flags4main)

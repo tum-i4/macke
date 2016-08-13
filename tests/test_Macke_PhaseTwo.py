@@ -3,7 +3,7 @@ import unittest
 from macke.Macke import Macke
 
 
-class TestMackePhaseOne(unittest.TestCase):
+class TestMackePhaseTwo(unittest.TestCase):
 
     def run_macke_test_on_file(self, bcfile):
         m = Macke(bcfile, quiet=True, flags_user=["--max-time=60"])
@@ -18,12 +18,11 @@ class TestMackePhaseOne(unittest.TestCase):
 
         self.assertEqual(m.errfunccount, 3)
 
-        # All three asserts should be propagated
+        # All three asserts should be propagated - and no other error
+        self.assertEqual(len(m.errorchains), 3)
         self.assertEqual(len(m.errorchains[0]), 2)
         self.assertEqual(len(m.errorchains[1]), 2)
         self.assertEqual(len(m.errorchains[2]), 2)
-        # And no other error
-        self.assertEqual(len(m.errorchains), 3)
 
         # 3 for phase one, 2 in f1 for phase two
         self.assertEqual(len(m.errorkleeruns), 3)
@@ -37,6 +36,7 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errfunccount, 4)
 
         # The longest chain has goes through all functions
+        self.assertTrue(m.errorchains)
         self.assertEqual(len(m.errorchains[0]), 4)
         # Their is only one chain with this length
         self.assertTrue(len(m.errorchains) == 1 or len(m.errorchains[1]) < 4)
