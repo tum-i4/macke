@@ -19,7 +19,10 @@ class TestMackePhaseTwo(unittest.TestCase):
         self.assertEqual(m.errfunccount, 3)
 
         # All three asserts should be propagated - and no other error
-        self.assertEqual(len(m.errorchains), 3)
+        # If working with multiple files
+        # self.assertEqual(len(m.errorchains), 3)
+        # If working with one file and multiple error checks
+        self.assertTrue(len(m.errorchains) >= 3)
         self.assertEqual(len(m.errorchains[0]), 2)
         self.assertEqual(len(m.errorchains[1]), 2)
         self.assertEqual(len(m.errorchains[2]), 2)

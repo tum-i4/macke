@@ -60,6 +60,9 @@ def prepend_error(sourcefile, function, errordirlist, destfile=None):
     """
     Wrapper around the prepend error pass
     """
+    # Reject empty error lists
+    assert(errordirlist)
+
     # If no destfile is given, just modify the source file
     if destfile is None:
         destfile = sourcefile

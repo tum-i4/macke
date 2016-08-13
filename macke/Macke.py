@@ -44,11 +44,12 @@ class Macke:
         self.parentdir = parentdir
 
         # Generate the path for the bitcode directory
-        self.bcdir = path.join(self.rundir, "bitcode")
+        self.bcdir = self.rundir
 
         # Generate the filename for the copy of the program
         self.program_bc = path.join(self.bcdir, "program.bc")
         self.symmains_bc = path.join(self.bcdir, "symmains.bc")
+        self.prepend_bc = path.join(self.bcdir, "prepend.bc")
 
         # Generate the directory containing all klee runs
         self.kleedir = path.join(self.rundir, "klee")
@@ -181,6 +182,9 @@ class Macke:
         again, but this time with targeted search for the function calls.
         """
 
+        # Prepare the bitcode file for error prepending
+        shutil.copy2(self.symmains_bc, self.prepend_bc)
+
         # Get (caller,callee)-pairs grouped in serialized runs
         runs = self.callgraph.group_independent_calls(
             removemain=not bool(self.flags4main))
@@ -203,9 +207,9 @@ class Macke:
         for run in runs:
             callees = set({callee for _, callee in run})
             for callee in callees:
-                prepend_error(
-                    self.symmains_bc, callee, self.errorkleeruns[callee],
-                    get_prepended_bcname(self.bcdir, callee))
+                if self.errorkleeruns[callee]:
+                    prepend_error(self.prepend_bc, callee,
+                                  self.errorkleeruns[callee])
 
             # all pairs inside a run can be executed in parallel
             totallyskipped += self.__execute_in_parallel_threads(run, 2, bar)
@@ -339,8 +343,7 @@ class Macke:
             for (caller, callee) in run:
                 if callee in self.errorkleeruns:
                     pool.apply_async(thread_phase_two, (
-                        caller, callee,
-                        get_prepended_bcname(self.bcdir, callee),
+                        caller, callee, self.prepend_bc,
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
                         self.flags_user, self.flags4main
@@ -406,14 +409,6 @@ class Macke:
         # Longest chains are reported first
         result.sort(key=lambda x: (len(x), x[0]), reverse=True)
         return result
-
-
-def get_prepended_bcname(bcdir, callee):
-    """
-    Build the path and name of a bc-file with prepended errors of callee
-    """
-    # "-" is a good separator, because "-" is not allowed in c function names
-    return path.join(bcdir, "prepended-%s.bc" % callee)
 
 
 def thread_phase_one(functionname, symmains_bc, outdir, flags, flags4main):
