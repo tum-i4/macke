@@ -9,7 +9,6 @@ from .config import KLEEBIN
 
 KLEEFLAGS = [
     "--allow-external-sym-calls",
-    "--disable-inlining",  # TODO, this should be done in the prepend llvm pass
     "--libc=uclibc",
     "--max-memory=1000",
     "--only-output-states-covering-new",
