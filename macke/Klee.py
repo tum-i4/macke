@@ -83,10 +83,17 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
         out = subprocess.check_output(command,
                                       stderr=subprocess.STDOUT).decode("utf-8")
     except subprocess.CalledProcessError as cperr:
-        # If something went wrong, throw the error to the command line
-        print("Error during:", command)
+        # If something went wrong, we still read the output for analysis
         out = cperr.output.decode("utf-8")
-        print(out)
+
+        # Some errors are expected and should not be reported
+        if not any(reason in out for reason in [
+                "LLVM ERROR: not enough shared memory",
+                "KLEE: WATCHDOG: time expired"]):
+            # throw the error to the command line
+            print()  # Empty line to seperate from previous output
+            print("Error during:", command)
+            print(out)
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)

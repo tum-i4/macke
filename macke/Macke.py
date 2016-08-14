@@ -64,6 +64,8 @@ class Macke:
         self.testcases = 0
         self.errfunccount = 0
         self.errtotalcount = 0
+        self.timeout = 0
+        self.outofmemory = 0
 
         # Map of function -> [kleeruns triggering an error]
         self.errorkleeruns = {}
@@ -255,6 +257,8 @@ class Macke:
             info["numberOfFunctionsWithErrors"] = self.errfunccount
             info["totalNumberOfErrors"] = self.errtotalcount
             info["functionToKleeRunWithErrorMap"] = self.errorkleeruns
+            info["klee-timeouts"] = self.timeout
+            info["klee-outofmemory"] = self.outofmemory
             info["errorchains"] = self.errorchains
             info["chainsfrommain"] = self.chainsfrommain
 
@@ -373,6 +377,13 @@ class Macke:
         self.errfunccount += (
             k.errorcount != 0 and k.analyzedfunc not in self.errorkleeruns)
         self.errtotalcount += k.errorcount
+
+        # Check for termination reasons
+        if "KLEE: WATCHDOG: time expired" in k.stdoutput:
+            self.timeout += 1
+
+        if "LLVM ERROR: not enough shared memory" in k.stdoutput:
+            self.outofmemory += 1
 
         # Create an empty entry, if function is not inside the map
         if k.analyzedfunc not in self.errorkleeruns:
