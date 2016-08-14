@@ -74,8 +74,9 @@ class CallGraph:
             assert res
             callers, callees = set(), set()
             for (caller, callee) in res:
-                callers.add(caller)
-                callees.add(callee)
+                if caller != callee:
+                    callers.add(caller)
+                    callees.add(callee)
             assert callers.isdisjoint(callees)
 
         return result

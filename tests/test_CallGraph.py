@@ -53,3 +53,9 @@ class TestCallGraph(unittest.TestCase):
         c = CallGraph(bcfile).group_independent_calls()
 
         self.assertEqual(c, [[('f1', 'f2'), ('f1', 'f3')]])
+
+    def test_edges_for_call_chain_propagation_factorial(self):
+        bcfile = "./examples/factorial.bc"
+        c = CallGraph(bcfile).group_independent_calls()
+
+        self.assertEqual(c, [[('fac', 'fac')]])
