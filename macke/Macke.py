@@ -6,7 +6,7 @@ Contains methods for both phases and some analysis
 from collections import OrderedDict
 from datetime import datetime
 import json
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 from os import makedirs, path, symlink, remove
 import shutil
 import sys
@@ -309,8 +309,9 @@ class Macke:
         # Create a pool with a fixed number of parallel processes
         # Either use the configured number of thread or one for each cpu thread
         pool = Pool(THREADNUM)
-        # Storage for the result of the runs
-        kleedones = []
+        # Managed (synchronized) storage for the result of the runs
+        manager = Manager()
+        kleedones = manager.list()
 
         # Dispense the KLEE runs on the workers in the pool
         skipped = self.__put_phase_threads_into_pool(
@@ -335,7 +336,7 @@ class Macke:
 
         return skipped
 
-    def __put_phase_threads_into_pool(self, phase, pool, run, callbacklist):
+    def __put_phase_threads_into_pool(self, phase, pool, run, resultlist):
         """
         Store a given run for one phase with the required arguments
         into the thread pool
@@ -347,21 +348,21 @@ class Macke:
         if phase == 1:
             for function in run:
                 pool.apply_async(thread_phase_one, (
-                    function, self.symmains_bc,
+                    resultlist, function, self.symmains_bc,
                     self.get_next_klee_directory(
                         dict(phase=phase, function=function)),
                     self.flags_user, self.flags4main
-                ), callback=callbacklist.append)
+                ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
             for (caller, callee) in run:
                 if callee in self.errorkleeruns:
                     pool.apply_async(thread_phase_two, (
-                        caller, callee, self.prepend_bc,
+                        resultlist, caller, callee, self.prepend_bc,
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
                         self.flags_user, self.flags4main
-                    ), callback=callbacklist.append)
+                    ))
                 else:
                     skipped += 1
         return skipped
@@ -432,18 +433,21 @@ class Macke:
         return result
 
 
-def thread_phase_one(functionname, symmains_bc, outdir, flags, flags4main):
+def thread_phase_one(
+        resultlist, functionname, symmains_bc, outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase one
     """
     # Just run KLEE on it
-    return execute_klee(symmains_bc, functionname, outdir, flags, flags4main)
+    resultlist.append(
+        execute_klee(symmains_bc, functionname, outdir, flags, flags4main))
 
 
-def thread_phase_two(caller, callee, prepended_bc, outdir, flags, flags4main):
+def thread_phase_two(
+        resultlist, caller, callee, prepended_bc, outdir, flags, flags4main):
     """
     This function is executed by the parallel processes in phase two
     """
     # And run klee on it
-    return execute_klee_targeted_search(
-        prepended_bc, caller, callee, outdir, flags, flags4main)
+    resultlist.append(execute_klee_targeted_search(
+        prepended_bc, caller, callee, outdir, flags, flags4main))
