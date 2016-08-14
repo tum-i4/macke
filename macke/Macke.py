@@ -308,7 +308,9 @@ class Macke:
         if not self.quiet:
             # Keeping track of the progress until everything is done
             while (len(kleedones) + skipped) != len(run):
-                pbar.update(donebefore + len(kleedones) + skipped)
+                newvalue = donebefore + len(kleedones) + skipped
+                if (pbar.value != newvalue):
+                    pbar.update(newvalue)
                 sleep(0.3)
             # One final update
             pbar.update(donebefore + len(kleedones) + skipped)
