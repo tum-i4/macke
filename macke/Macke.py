@@ -11,11 +11,19 @@ from os import makedirs, path, symlink, remove
 import shutil
 import sys
 from time import sleep
-from progressbar import ProgressBar
+from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
 from .Klee import execute_klee, execute_klee_targeted_search
 from .llvm_wrapper import encapsulate_symbolic, prepend_error
+
+WIDGETS = [
+    widgets.Percentage(),
+    ' (', widgets.SimpleProgress(), ')',
+    ' ', widgets.Bar(),
+    ' ', widgets.Timer(),
+    ' ', widgets.ETA(),
+]
 
 
 class Macke:
@@ -169,7 +177,8 @@ class Macke:
             if functionname != "main":
                 encapsulate_symbolic(self.symmains_bc, functionname)
 
-        bar = ProgressBar(max_value=len(tasks)) if not self.quiet else None
+        bar = ProgressBar(
+            widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
         self.__execute_in_parallel_threads(tasks, 1, bar)
 
         if not self.quiet:
@@ -204,7 +213,8 @@ class Macke:
                     "propagation" % (qualified, total))
 
         totallyskipped = 0
-        bar = ProgressBar(max_value=qualified) if not self.quiet else None
+        bar = ProgressBar(
+            widgets=WIDGETS, max_value=qualified) if not self.quiet else None
 
         for run in runs:
             callees = set({callee for _, callee in run})
@@ -312,9 +322,7 @@ class Macke:
         if not self.quiet:
             # Keeping track of the progress until everything is done
             while (len(kleedones) + skipped) != len(run):
-                newvalue = donebefore + len(kleedones) + skipped
-                if (pbar.value != newvalue):
-                    pbar.update(newvalue)
+                pbar.update(donebefore + len(kleedones) + skipped)
                 sleep(0.3)
             # One final update
             pbar.update(donebefore + len(kleedones) + skipped)
