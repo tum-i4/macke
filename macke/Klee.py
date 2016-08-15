@@ -14,7 +14,7 @@ KLEEFLAGS = [
     "--only-output-states-covering-new",
     "--optimize",
     # "--output-module",  # Helpful for debugging
-    # "--output-source=false",  # Removing this is helpful for debugging
+    "--output-source=false",  # Removing this is helpful for debugging
     "--posix-runtime",
     "--watchdog"
 ]
