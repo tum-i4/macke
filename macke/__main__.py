@@ -77,17 +77,19 @@ def main():
     ]
 
     # Compose flags for analysing the main function
-    flags4main = []
+    posix4main = []
     if args.sym_args:
-        flags4main.append("--sym-args")
-        flags4main.extend(args.sym_args)
+        posix4main.append("--sym-args")
+        posix4main.extend(args.sym_args)
+
+    posixflags = []
     if args.sym_files:
-        flags4main.append("--sym-files")
-        flags4main.extend(args.sym_files)
+        posixflags.append("--sym-files")
+        posixflags.extend(args.sym_files)
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, flags4main)
+                  False, flags_user, posixflags, posix4main)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

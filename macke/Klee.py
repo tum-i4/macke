@@ -58,27 +58,32 @@ class KleeResult:
         return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
 
 
-def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
+def execute_klee(
+        bcfile, analyzedfunc, outdir,
+        flags=None, posixflags=None, posix4main=None):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
 
     # use empty list as default flags
     flags = [] if flags is None else flags
-    flags4main = [] if flags4main is None else flags4main
     flags.extend(KLEEFLAGS)
 
-    if analyzedfunc != "main":
+    # Build the posix flags
+    posixflags = [] if posixflags is None else posixflags
+    posix4main = [] if posix4main is None else posix4main
+
+    if analyzedfunc == "main":
+        # the main function is handled a little bit differently
+        posixflags.extend(posix4main)
+    else:
         flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
-        # actually run KLEE
-        command = [KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile]
-    else:
-        # the main function is handled a little bit differently
-        # Strange, but the flags passed to main must be append after bcfile
-        command = [
-            KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile] + flags4main
+    # Strange, but the posix flags must be append after bcfile
+    command = ([KLEEBIN, "--output-dir=" + outdir] + flags +
+               [bcfile] + posixflags)
 
+    # actually run KLEE
     try:
         out = subprocess.check_output(
             command, stderr=subprocess.STDOUT).decode("utf-8", 'ignore')
@@ -100,7 +105,8 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
 
 
 def execute_klee_targeted_search(
-        bcfile, analyzedfunc, targetfunc, outdir, flags=None, flags4main=None):
+        bcfile, analyzedfunc, targetfunc, outdir,
+        flags=None, posixflags=None, posix4main=None):
     """
     Execute KLEE on a bitcode file with targeted search for targetfunc
     """
@@ -108,4 +114,5 @@ def execute_klee_targeted_search(
     # use empty list as default flags
     flags = [] if flags is None else flags
     flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
-    return execute_klee(bcfile, analyzedfunc, outdir, flags, flags4main)
+    return execute_klee(
+        bcfile, analyzedfunc, outdir, flags, posixflags, posix4main)

@@ -8,7 +8,8 @@ class TestMackeWithMain(unittest.TestCase):
     def run_macke_test_on_file(self, bcfile):
         m = Macke(bcfile, quiet=True,
                   flags_user=["--max-time=60"],
-                  flags4main=['--sym-args', '1', '1', '2'])
+                  posixflags=["--sym-files", "1", "100"],
+                  posix4main=['--sym-args', '1', '1', '2'])
         m.run_initialization()
         m.run_phase_one()
         m.run_phase_two()

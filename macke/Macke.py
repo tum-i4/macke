@@ -33,7 +33,7 @@ class Macke:
 
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
-                 flags_user=None, flags4main=None):
+                 flags_user=None, posixflags=None, posix4main=None):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -43,7 +43,8 @@ class Macke:
         # Store information from command line
         self.comment = comment
         self.flags_user = flags_user if flags_user is not None else []
-        self.flags4main = flags4main if flags4main is not None else []
+        self.posixflags = posixflags if posixflags is not None else []
+        self.posix4main = posix4main if posix4main is not None else []
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
@@ -165,7 +166,7 @@ class Macke:
 
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.list_symbolic_encapsulable(
-            removemain=not bool(self.flags4main))
+            removemain=not bool(self.posix4main))
 
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
@@ -200,7 +201,7 @@ class Macke:
 
         # Get (caller,callee)-pairs grouped in serialized runs
         runs = self.callgraph.group_independent_calls(
-            removemain=not bool(self.flags4main))
+            removemain=not bool(self.posix4main))
 
         # Store old counter to calculate progress in phase two
         olderrfunccount = self.errfunccount
@@ -354,7 +355,7 @@ class Macke:
                     resultlist, function, self.symmains_bc,
                     self.get_next_klee_directory(
                         dict(phase=phase, function=function)),
-                    self.flags_user, self.flags4main
+                    self.flags_user, self.posixflags, self.posix4main
                 ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
@@ -364,7 +365,7 @@ class Macke:
                         resultlist, caller, callee, self.prepend_bc,
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
-                        self.flags_user, self.flags4main
+                        self.flags_user, self.posixflags, self.posix4main
                     ))
                 else:
                     skipped += 1
@@ -437,20 +438,22 @@ class Macke:
 
 
 def thread_phase_one(
-        resultlist, functionname, symmains_bc, outdir, flags, flags4main):
+        resultlist, functionname, symmains_bc, outdir,
+        flags, posixflags, posix4main):
     """
     This function is executed by the parallel processes in phase one
     """
     # Just run KLEE on it
-    resultlist.append(
-        execute_klee(symmains_bc, functionname, outdir, flags, flags4main))
+    resultlist.append(execute_klee(
+        symmains_bc, functionname, outdir, flags, posixflags, posix4main))
 
 
 def thread_phase_two(
-        resultlist, caller, callee, prepended_bc, outdir, flags, flags4main):
+        resultlist, caller, callee, prepended_bc, outdir,
+        flags, posixflags, posix4main):
     """
     This function is executed by the parallel processes in phase two
     """
     # And run klee on it
     resultlist.append(execute_klee_targeted_search(
-        prepended_bc, caller, callee, outdir, flags, flags4main))
+        prepended_bc, caller, callee, outdir, flags, posixflags, posix4main))
