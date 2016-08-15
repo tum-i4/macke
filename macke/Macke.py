@@ -86,7 +86,7 @@ class Macke:
         # Some attributes, that are filled later
         self.callgraph = None
         self.chainsfrommain = 0
-        self.starttime = None
+        self.starttimephase2 = None
         self.endtime = None
 
         # Setting quiet == True suppress all outputs
