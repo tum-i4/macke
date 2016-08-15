@@ -85,6 +85,7 @@ class Macke:
         # Some attributes, that are filled later
         self.callgraph = None
         self.chainsfrommain = 0
+        self.starttime = None
         self.endtime = None
 
         # Setting quiet == True suppress all outputs
@@ -192,6 +193,7 @@ class Macke:
         Prepend errors from phase one to all functions and analyze with KLEE
         again, but this time with targeted search for the function calls.
         """
+        self.starttimephase2 = datetime.now()
 
         # Prepare the bitcode file for error prepending
         shutil.copy2(self.symmains_bc, self.prepend_bc)
@@ -262,6 +264,7 @@ class Macke:
             info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
+            info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
             info["testcases"] = self.testcases
             info["numberOfFunctionsWithErrors"] = self.errfunccount
