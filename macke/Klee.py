@@ -80,11 +80,11 @@ def execute_klee(bcfile, analyzedfunc, outdir, flags=None, flags4main=None):
             KLEEBIN, "--output-dir=" + outdir] + flags + [bcfile] + flags4main
 
     try:
-        out = subprocess.check_output(command,
-                                      stderr=subprocess.STDOUT).decode("utf-8")
+        out = subprocess.check_output(
+            command, stderr=subprocess.STDOUT).decode("utf-8", 'ignore')
     except subprocess.CalledProcessError as cperr:
         # If something went wrong, we still read the output for analysis
-        out = cperr.output.decode("utf-8")
+        out = cperr.output.decode("utf-8", 'ignore')
 
         # Some errors are expected and should not be reported
         if not any(reason in out for reason in [
