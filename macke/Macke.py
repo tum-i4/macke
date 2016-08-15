@@ -219,7 +219,7 @@ class Macke:
         for run in runs:
             callees = set({callee for _, callee in run})
             for callee in callees:
-                if self.errorkleeruns[callee]:
+                if callee in self.errorkleeruns and self.errorkleeruns[callee]:
                     prepend_error(self.prepend_bc, callee,
                                   self.errorkleeruns[callee])
 
