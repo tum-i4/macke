@@ -100,18 +100,22 @@ class Macke:
         """
 
         self.kleecount += 1
-        result = path.join(self.kleedir, "klee-out-%d" % self.kleecount)
+        kleeout = "klee-out-%d" % self.kleecount
+        kleepath = path.join(self.kleedir, kleeout)
 
         # Add the new file also to the klee index
+        infojson = dict(info)
+        infojson['folder'] = kleepath
         outjson = dict()
-        outjson[result] = info
+        outjson[kleeout] = OrderedDict(
+            sorted(infojson.items(), key=lambda t: t[0]))
         with open(self.kleejson, 'a') as f:
             # Prepend separator for all but the first entry
             if self.kleecount != 1:
                 f.write(", ")
             f.write(json.dumps(outjson)[1:-1])
 
-        return result
+        return kleepath
 
     def run_complete_analysis(self):
         """
@@ -167,6 +171,10 @@ class Macke:
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.list_symbolic_encapsulable(
             removemain=not bool(self.posix4main))
+
+        # Fill storage for errors in klee runs with all suitable functions
+        for task in tasks:
+            self.errorkleeruns[task] = list()
 
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
@@ -270,7 +278,8 @@ class Macke:
             info["testcases"] = self.testcases
             info["numberOfFunctionsWithErrors"] = self.errfunccount
             info["totalNumberOfErrors"] = self.errtotalcount
-            info["functionToKleeRunWithErrorMap"] = self.errorkleeruns
+            info["functionToKleeRunWithErrorMap"] = OrderedDict(
+                sorted(self.errorkleeruns.items(), key=lambda t: t[0]))
             info["klee-timeouts"] = self.timeout
             info["klee-outofmemory"] = self.outofmemory
             info["errorchains"] = self.errorchains
@@ -388,7 +397,7 @@ class Macke:
         # fill some counters
         self.testcases += k.testcount
         self.errfunccount += (
-            k.errorcount != 0 and k.analyzedfunc not in self.errorkleeruns)
+            k.errorcount != 0 and not self.errorkleeruns.get(k.analyzedfunc))
         self.errtotalcount += k.errorcount
 
         # Check for termination reasons
