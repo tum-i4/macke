@@ -88,3 +88,15 @@ def remove_unreachable_from(entrypoint, sourcefile, destfile=None):
     return __run_subprocess([
         LLVMOPT, "-internalize-public-api-list=%s" % entrypoint, sourcefile,
         "-internalize", "-globalopt", "-globaldce", "-o", destfile])
+
+
+def optimize_redundant_globals(sourcefile, destfile=None):
+    """
+    Runs an llvm opt pass, that merges all globals with identical content
+    """
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
+
+    return __run_subprocess([
+        LLVMOPT, "-constmerge", sourcefile, "-o", destfile])

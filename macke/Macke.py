@@ -15,7 +15,8 @@ from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
 from .Klee import execute_klee, execute_klee_targeted_search
-from .llvm_wrapper import encapsulate_symbolic, prepend_error
+from .llvm_wrapper import (
+    encapsulate_symbolic, optimize_redundant_globals, prepend_error)
 
 WIDGETS = [
     widgets.Percentage(),
@@ -233,6 +234,7 @@ class Macke:
                 if callee in self.errorkleeruns and self.errorkleeruns[callee]:
                     prepend_error(self.prepend_bc, callee,
                                   self.errorkleeruns[callee])
+            optimize_redundant_globals(self.prepend_bc)
 
             # all pairs inside a run can be executed in parallel
             totallyskipped += self.__execute_in_parallel_threads(run, 2, bar)
