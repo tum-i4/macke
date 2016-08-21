@@ -40,8 +40,9 @@ class CallGraph:
             else:
                 flattened.extend(topo)
 
-        return [t for t in flattened if (not self[t]['hasdoubleptrarg'] or (
-            not removemain and t == "main"))]
+        return [t for t in flattened if (not self[t]['hasfuncptrarg'] and (
+            not self[t]['hasdoubleptrarg'] or (not removemain and t == "main"))
+        )]
 
     def group_independent_calls(self, removemain=True):
         """
