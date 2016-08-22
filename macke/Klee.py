@@ -43,9 +43,10 @@ class KleeResult:
         self.testcount = int(match.group(1)) if match else 0
 
         # Grap all the error files
-        self.errfiles = [path.join(self.outdir, file)
-                         for file in listdir(self.outdir)
-                         if file.endswith(".err")]
+        self.errfiles = ([path.join(self.outdir, file)
+                          for file in listdir(self.outdir)
+                          if file.endswith(".err")]
+                         if path.isdir(self.outdir) else [])
 
         # Search for error chains [(new, old)]
         self.chained = []
