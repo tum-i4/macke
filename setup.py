@@ -16,7 +16,8 @@ setup(
     license="Apache Software License",
     entry_points={
         'console_scripts': [
-            'macke = macke.__main__:main'
+            'macke = macke.__main__:main',
+            'macke-runtime = macke.mini.analyse_runtime:main'
         ]
     },
     classifiers=[
