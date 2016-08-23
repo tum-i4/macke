@@ -21,6 +21,9 @@ KLEEFLAGS = [
     "--watchdog"
 ]
 
+ERRORFILEEXTENSIONS = [
+    "ptr.err", "free.err", "assert.err", "div.err", "macke.err"]
+
 
 class KleeResult:
     """
@@ -43,7 +46,8 @@ class KleeResult:
         # Grap all the error files
         self.errfiles = ([path.join(self.outdir, file)
                           for file in listdir(self.outdir)
-                          if file.endswith(".err")]
+                          if any(file.endswith(ext)
+                                 for ext in ERRORFILEEXTENSIONS)]
                          if path.isdir(self.outdir) else [])
 
         self.errorcount = len(self.errfiles)
