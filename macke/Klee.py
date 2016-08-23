@@ -36,8 +36,6 @@ class KleeResult:
         self.stdoutput = stdoutput
 
         # Calculate some statistics
-        self.errorcount = self.stdoutput.count("KLEE: ERROR:")
-
         match = re.search(
             r"KLEE: done: generated tests = (\d+)", self.stdoutput)
         self.testcount = int(match.group(1)) if match else 0
@@ -47,6 +45,8 @@ class KleeResult:
                           for file in listdir(self.outdir)
                           if file.endswith(".err")]
                          if path.isdir(self.outdir) else [])
+
+        self.errorcount = len(self.errfiles)
 
         # Search for error chains [(new, old)]
         self.chained = []
