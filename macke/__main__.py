@@ -40,7 +40,7 @@ def main():
         '--max-time',
         nargs='?',
         type=int,
-        default=300,
+        default=120,
         help="Maximum execution time for one KLEE run"
     )
 
@@ -48,7 +48,7 @@ def main():
         '--max-instruction-time',
         nargs='?',
         type=int,
-        default=30,
+        default=12,
         help="Maximum execution time KLEE can spend on one instruction"
     )
 
