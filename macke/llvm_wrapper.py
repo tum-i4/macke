@@ -100,3 +100,12 @@ def optimize_redundant_globals(sourcefile, destfile=None):
 
     return __run_subprocess([
         LLVMOPT, "-constmerge", sourcefile, "-o", destfile])
+
+
+def extract_lines_of_code(bitcodefile):
+    """
+    Extract all lines of code represented inside a bitcode file
+    """
+    return __run_subprocess_json_output([
+        LLVMOPT, "-load", LIBMACKEOPT,
+        "-extractlinesofcode", bitcodefile, "-disable-output"])

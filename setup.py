@@ -18,6 +18,7 @@ setup(
         'console_scripts': [
             'macke = macke.__main__:main',
             'macke-facile-chains = macke.mini.count_facile_chains:main',
+            'macke-linecoverage = macke.mini.linecoverage:main',
             'macke-runtime = macke.mini.analyse_runtime:main',
         ]
     },
