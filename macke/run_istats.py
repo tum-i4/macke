@@ -52,14 +52,6 @@ def extract_linecoverage(run_istats_file):
 
     result = dict()
     for file, lines in extract.items():
-        if not any(excludes in file for excludes in {
-                "/libc/string/",
-                "/runtime/Intrinsic/",
-                "/runtime/POSIX/",
-                "/libc/termios/",
-                "/libc/stdio/",
-                "/libc/stdlib/",
-                "/klee-uclibc/"}):
-            result[file] = lines
+        result[file] = lines
 
     return result
