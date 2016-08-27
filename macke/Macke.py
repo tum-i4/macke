@@ -23,7 +23,7 @@ from .llvm_wrapper import (
 WIDGETS = [
     widgets.Percentage(),
     ' (', widgets.SimpleProgress(), ')',
-    ' ', widgets.Bar(),
+    ' ', widgets.Bar("="),
     ' ', widgets.Timer(),
     ' ', widgets.ETA(),
 ]
@@ -75,8 +75,6 @@ class Macke:
 
         # Initialize some statistic counter
         self.testcases = 0
-
-        self.errtotalcount = 0
 
         # Map of function -> [kleeruns triggering an error]
         self.errorkleeruns = {}
@@ -182,6 +180,7 @@ class Macke:
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
+        self.qprint("Phase 1: Adding new entry points ...", end="")
         # Copy the program bc before encapsulating everything symbolically
         shutil.copy2(self.program_bc, self.symmains_bc)
 
@@ -189,6 +188,8 @@ class Macke:
         for functionname in tasks:
             if functionname != "main":
                 encapsulate_symbolic(self.symmains_bc, functionname)
+        self.qprint(" done")
+        self.qprint("Phase 1: Performing KLEE runs ...")
 
         bar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
@@ -198,7 +199,7 @@ class Macke:
             bar.finish()
 
         self.qprint("Phase 1: Found %d errors spread over %d functions" %
-                    (self.errtotalcount,
+                    (self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
     def run_phase_two(self):
@@ -212,9 +213,6 @@ class Macke:
         runs = self.callgraph.group_independent_calls(
             removemain=not bool(self.posix4main))
 
-        # Store old counter to calculate progress in phase two
-        olderrfunccount = self.errorregistry.count_functions_with_errors()
-
         # Calculate some statistics
         qualified = sum(len(run) for run in runs)
         total = sum(len(value["calls"])
@@ -224,6 +222,8 @@ class Macke:
         self.qprint("Phase 2: %d of %d calls are suitable for error chain "
                     "propagation" % (qualified, total))
 
+        self.qprint("Phase 2: Performing KLEE runs with targeted search "
+                    "if needed ...")
         totallyskipped = 0
         bar = ProgressBar(
             widgets=WIDGETS, max_value=qualified) if not self.quiet else None
@@ -240,14 +240,9 @@ class Macke:
             len(c) > 1 and path.dirname(c[0]) in self.errorkleeruns['main']))
             if 'main' in self.errorkleeruns else 0)
 
-        self.qprint("Phase 2: %d additional KLEE analyses were started" %
-                    (qualified - totallyskipped))
-        self.qprint("Phase 2: %d error-chains were found through %d "
-                    "previously not affected functions" %
-                    (len(self.errorchains),
-                     self.errorregistry.count_functions_with_errors() -
-                        olderrfunccount))
-        self.qprint("Phase 2: %d chains start in main" % self.chainsfrommain)
+        self.qprint("Phase 2: %d additional KLEE analyzes propagate %d "
+                    "errors" % (qualified - totallyskipped,
+                                self.errorregistry.mackerrorcounter))
 
     def run_finalization(self):
         """
@@ -259,7 +254,7 @@ class Macke:
                     (self.testcases, self.kleecount))
         self.qprint("Summary: %d errors were detected spread over %d "
                     "functions" % (
-                        self.errtotalcount,
+                        self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
         # Close the json of the klee run index file
@@ -277,7 +272,6 @@ class Macke:
             """
             info["testcases"] = self.testcases
             info["numberOfFunctionsWithErrors"] = self.errfunccount
-            info["totalNumberOfErrors"] = self.errtotalcount
             info["functionToKleeRunWithErrorMap"] = OrderedDict(
                 sorted(self.errorkleeruns.items(), key=lambda t: t[0]))
             info["errorchains"] = self.errorchains
@@ -417,7 +411,6 @@ class Macke:
 
         # fill some counters
         self.testcases += k.testcount
-        self.errtotalcount += k.errorcount
 
         # Create an empty entry, if function is not inside the map
         if k.analyzedfunc not in self.errorkleeruns:

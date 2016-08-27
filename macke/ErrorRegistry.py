@@ -17,6 +17,7 @@ class ErrorRegistry:
         self.forvulninst = dict()
 
         self.errorcounter = 0
+        self.mackerrorcounter = 0
 
     def create_from_dir(self, kleedir, entryfunction):
         """ register all errors from directory """
@@ -35,6 +36,9 @@ class ErrorRegistry:
         add_to_listdict(self.forfunction, error.entryfunction, error)
         add_to_listdict(self.forvulninst, error.vulnerableInstruction, error)
         self.errorcounter += 1
+
+        if error.errfile.endswith(".macke"):
+            self.mackerrorcounter += 1
 
     def count_error_test_cases(self):
         """
