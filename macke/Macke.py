@@ -14,10 +14,11 @@ from time import sleep
 from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
-from .Klee import execute_klee, execute_klee_targeted_search
+from .threads import thread_phase_one, thread_phase_two
 from .llvm_wrapper import (
     encapsulate_symbolic, optimize_redundant_globals, prepend_error)
 
+# The widgets used by the process bar
 WIDGETS = [
     widgets.Percentage(),
     ' (', widgets.SimpleProgress(), ')',
@@ -446,40 +447,3 @@ class Macke:
         # Longest chains are reported first
         result.sort(key=lambda x: (len(x), x[0]), reverse=True)
         return result
-
-
-def thread_phase_one(
-        resultlist, functionname, symmains_bc, outdir,
-        flags, posixflags, posix4main):
-    """
-    This function is executed by the parallel processes in phase one
-    """
-    # Just run KLEE on it
-    try:
-        resultlist.append(execute_klee(
-            symmains_bc, functionname, outdir, flags, posixflags, posix4main))
-    except Exception as exc:
-        print()
-        print("A thread in phase one throws and exception")
-        print("The analyzed function was:", functionname)
-        print(exc)
-        print()
-
-
-def thread_phase_two(
-        resultlist, caller, callee, prepended_bc, outdir,
-        flags, posixflags, posix4main):
-    """
-    This function is executed by the parallel processes in phase two
-    """
-    # And run klee on it
-    try:
-        resultlist.append(execute_klee_targeted_search(
-            prepended_bc, caller, callee, outdir,
-            flags, posixflags, posix4main))
-    except Exception as exc:
-        print()
-        print("A thread in phase two throws and exception")
-        print("The analyzed caller/callee pair was:", caller, callee)
-        print(exc)
-        print()
