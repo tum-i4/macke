@@ -56,7 +56,7 @@ def encapsulate_symbolic(sourcefile, function, destfile=None):
         "-encapsulatedfunction", function, "-o", destfile])
 
 
-def prepend_error(sourcefile, function, errordirlist, destfile=None):
+def prepend_error_from_dir(sourcefile, function, errordirlist, destfile=None):
     """
     Wrapper around the prepend error pass
     """
@@ -75,6 +75,27 @@ def prepend_error(sourcefile, function, errordirlist, destfile=None):
     return __run_subprocess([
         LLVMOPT, "-load", LIBMACKEOPT, "-preprenderror", sourcefile,
         "-prependtofunction", function] + errordirflags + ["-o", destfile])
+
+
+def prepend_error_from_ktest(sourcefile, function, ktestlist, destfile=None):
+    """
+    Wrapper around the prepend error pass
+    """
+    # Reject empty ktest lists
+    assert ktestlist
+
+    # If no destfile is given, just modify the source file
+    if destfile is None:
+        destfile = sourcefile
+
+    ktestflags = []
+    for ktest in ktestlist:
+        ktestflags.append("-errorfiletoprepend")
+        ktestflags.append(ktest)
+
+    return __run_subprocess([
+        LLVMOPT, "-load", LIBMACKEOPT, "-preprenderror", sourcefile,
+        "-prependtofunction", function] + ktestflags + ["-o", destfile])
 
 
 def remove_unreachable_from(entrypoint, sourcefile, destfile=None):

@@ -6,7 +6,9 @@ from macke.Macke import Macke
 class TestMackePhaseTwo(unittest.TestCase):
 
     def run_macke_test_on_file(self, bcfile):
-        m = Macke(bcfile, quiet=True, flags_user=["--max-time=60"])
+        m = Macke(
+            bcfile, quiet=True, flags_user=["--max-time=60"],
+            exclude_known_from_phase_two=False)
         m.run_initialization()
         m.run_phase_one()
         m.run_phase_two()
@@ -16,7 +18,7 @@ class TestMackePhaseTwo(unittest.TestCase):
     def test_with_small(self):
         m = self.run_macke_test_on_file("examples/small.bc")
 
-        self.assertEqual(m.errfunccount, 3)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 3)
 
         # All three asserts should be propagated - and no other error
         # If working with multiple files
@@ -36,7 +38,7 @@ class TestMackePhaseTwo(unittest.TestCase):
     def test_with_chain(self):
         m = self.run_macke_test_on_file("examples/chain.bc")
 
-        self.assertEqual(m.errfunccount, 4)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 4)
 
         # The longest chain has goes through all functions
         self.assertTrue(m.errorchains)

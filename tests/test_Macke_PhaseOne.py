@@ -17,7 +17,7 @@ class TestMackePhaseOne(unittest.TestCase):
 
         self.assertEqual(m.testcases, 10)
         self.assertEqual(m.errtotalcount, 0)
-        self.assertEqual(m.errfunccount, 0)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
         # All entries in the map should be empty
         self.assertEqual(sum(len(v) for _, v in m.errorkleeruns.items()), 0)
@@ -27,7 +27,7 @@ class TestMackePhaseOne(unittest.TestCase):
 
         self.assertEqual(m.testcases, 2)
         self.assertEqual(m.errtotalcount, 1)
-        self.assertEqual(m.errfunccount, 1)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 1)
 
         self.assertEqual(len(m.errorkleeruns), 1)
         self.assertEqual(len(m.errorkleeruns['not42']), 1)
@@ -37,7 +37,7 @@ class TestMackePhaseOne(unittest.TestCase):
 
         self.assertEqual(m.testcases, 0)
         self.assertEqual(m.errtotalcount, 0)
-        self.assertEqual(m.errfunccount, 0)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
         self.assertEqual(m.errorkleeruns, {})
 
@@ -48,7 +48,7 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.testcases, 10)
         # 3 for f1, 1 for f2, 2 for f3
         self.assertEqual(m.errtotalcount, 6)
-        self.assertEqual(m.errfunccount, 3)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 3)
 
         self.assertEqual(len(m.errorkleeruns), 3)
         self.assertEqual(len(m.errorkleeruns['f1']), 1)

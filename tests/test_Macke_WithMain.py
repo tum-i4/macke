@@ -9,7 +9,8 @@ class TestMackeWithMain(unittest.TestCase):
         m = Macke(bcfile, quiet=True,
                   flags_user=["--max-time=60"],
                   posixflags=["--sym-files", "1", "100"],
-                  posix4main=['--sym-args', '1', '1', '2'])
+                  posix4main=['--sym-args', '1', '1', '2'],
+                  exclude_known_from_phase_two=False)
         m.run_initialization()
         m.run_phase_one()
         m.run_phase_two()
@@ -21,12 +22,12 @@ class TestMackeWithMain(unittest.TestCase):
 
         self.assertEqual(m.testcases, 2)
         self.assertEqual(m.errtotalcount, 1)
-        self.assertEqual(m.errfunccount, 1)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 1)
 
     def test_with_chain(self):
         m = self.run_macke_test_on_file("examples/chain.bc")
 
-        self.assertEqual(m.errfunccount, 5)
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 5)
 
         # The longest chain has goes through all functions including main
         self.assertEqual(len(m.errorchains[0]), 5)

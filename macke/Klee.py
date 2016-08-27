@@ -6,6 +6,7 @@ from os import listdir, path
 import re
 import subprocess
 from .config import KLEEBIN
+from .constants import ERRORFILEEXTENSIONS
 
 KLEEFLAGS = [
     "--allow-external-sym-calls",
@@ -20,9 +21,6 @@ KLEEFLAGS = [
     "--stats-write-interval=3600",
     "--watchdog"
 ]
-
-ERRORFILEEXTENSIONS = [
-    "ptr.err", "free.err", "assert.err", "div.err", "macke.err"]
 
 
 class KleeResult:

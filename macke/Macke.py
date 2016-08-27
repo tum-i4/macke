@@ -14,9 +14,10 @@ from time import sleep
 from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import CONFIGFILE, THREADNUM, get_current_git_hash
+from .ErrorRegistry import ErrorRegistry
 from .threads import thread_phase_one, thread_phase_two
 from .llvm_wrapper import (
-    encapsulate_symbolic, optimize_redundant_globals, prepend_error)
+    encapsulate_symbolic, optimize_redundant_globals, prepend_error_from_ktest)
 
 # The widgets used by the process bar
 WIDGETS = [
@@ -35,7 +36,8 @@ class Macke:
 
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
-                 flags_user=None, posixflags=None, posix4main=None):
+                 flags_user=None, posixflags=None, posix4main=None,
+                 exclude_known_from_phase_two=True):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -47,6 +49,7 @@ class Macke:
         self.flags_user = flags_user if flags_user is not None else []
         self.posixflags = posixflags if posixflags is not None else []
         self.posix4main = posix4main if posix4main is not None else []
+        self.exclude_known_from_phase_two = exclude_known_from_phase_two
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
@@ -55,12 +58,11 @@ class Macke:
         self.parentdir = parentdir
 
         # Generate the path for the bitcode directory
-        self.bcdir = self.rundir
+        self.bcdir = path.join(self.rundir, "bitcode")
 
         # Generate the filename for the copy of the program
         self.program_bc = path.join(self.bcdir, "program.bc")
         self.symmains_bc = path.join(self.bcdir, "symmains.bc")
-        self.prepend_bc = path.join(self.bcdir, "prepend.bc")
 
         # Generate the directory containing all klee runs
         self.kleedir = path.join(self.rundir, "klee")
@@ -73,10 +75,8 @@ class Macke:
 
         # Initialize some statistic counter
         self.testcases = 0
-        self.errfunccount = 0
+
         self.errtotalcount = 0
-        self.timeout = 0
-        self.outofmemory = 0
 
         # Map of function -> [kleeruns triggering an error]
         self.errorkleeruns = {}
@@ -90,6 +90,7 @@ class Macke:
         self.chainsfrommain = 0
         self.starttimephase2 = None
         self.endtime = None
+        self.errorregistry = ErrorRegistry()
 
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
@@ -197,7 +198,8 @@ class Macke:
             bar.finish()
 
         self.qprint("Phase 1: Found %d errors spread over %d functions" %
-                    (self.errtotalcount, self.errfunccount))
+                    (self.errtotalcount,
+                        self.errorregistry.count_functions_with_errors()))
 
     def run_phase_two(self):
         """
@@ -206,15 +208,12 @@ class Macke:
         """
         self.starttimephase2 = datetime.now()
 
-        # Prepare the bitcode file for error prepending
-        shutil.copy2(self.symmains_bc, self.prepend_bc)
-
         # Get (caller,callee)-pairs grouped in serialized runs
         runs = self.callgraph.group_independent_calls(
             removemain=not bool(self.posix4main))
 
         # Store old counter to calculate progress in phase two
-        olderrfunccount = self.errfunccount
+        olderrfunccount = self.errorregistry.count_functions_with_errors()
 
         # Calculate some statistics
         qualified = sum(len(run) for run in runs)
@@ -230,13 +229,6 @@ class Macke:
             widgets=WIDGETS, max_value=qualified) if not self.quiet else None
 
         for run in runs:
-            callees = set({callee for _, callee in run})
-            for callee in callees:
-                if callee in self.errorkleeruns and self.errorkleeruns[callee]:
-                    prepend_error(self.prepend_bc, callee,
-                                  self.errorkleeruns[callee])
-            optimize_redundant_globals(self.prepend_bc)
-
             # all pairs inside a run can be executed in parallel
             totallyskipped += self.__execute_in_parallel_threads(run, 2, bar)
 
@@ -253,7 +245,8 @@ class Macke:
         self.qprint("Phase 2: %d error-chains were found through %d "
                     "previously not affected functions" %
                     (len(self.errorchains),
-                     self.errfunccount - olderrfunccount))
+                     self.errorregistry.count_functions_with_errors() -
+                        olderrfunccount))
         self.qprint("Phase 2: %d chains start in main" % self.chainsfrommain)
 
     def run_finalization(self):
@@ -265,30 +258,40 @@ class Macke:
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
                     (self.testcases, self.kleecount))
         self.qprint("Summary: %d errors were detected spread over %d "
-                    "functions" % (self.errtotalcount, self.errfunccount))
+                    "functions" % (
+                        self.errtotalcount,
+                        self.errorregistry.count_functions_with_errors()))
 
         # Close the json of the klee run index file
         with open(self.kleejson, 'a') as f:
             f.write("}")
 
         # Export all the data gathered so far to a json file
-        with open(path.join(self.rundir, "result.json"), 'w') as f:
+        with open(path.join(self.rundir, "timing.json"), 'w') as f:
             info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
             info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
+
+            """
             info["testcases"] = self.testcases
             info["numberOfFunctionsWithErrors"] = self.errfunccount
             info["totalNumberOfErrors"] = self.errtotalcount
             info["functionToKleeRunWithErrorMap"] = OrderedDict(
                 sorted(self.errorkleeruns.items(), key=lambda t: t[0]))
-            info["klee-timeouts"] = self.timeout
-            info["klee-outofmemory"] = self.outofmemory
             info["errorchains"] = self.errorchains
             info["chainsfrommain"] = self.chainsfrommain
+            """
 
             json.dump(info, f)
+
+        self.create_macke_last_symlink()
+
+    def create_macke_last_symlink(self):
+        """
+        Create a symbolic link "macke-last" pointing the current macke outdir
+        """
 
         # link the current directory as macke-last
         symlinkname = path.join(self.parentdir, "macke-last")
@@ -372,9 +375,20 @@ class Macke:
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
             for (caller, callee) in run:
-                if callee in self.errorkleeruns:
+                kteststoprepend = (
+                    self.errorregistry.get_errfiles_to_prepend_in_phase_two(
+                        caller, callee, self.exclude_known_from_phase_two))
+
+                if kteststoprepend:
+                    prepended_bcfile = get_chain_segment_bcname(
+                        self.bcdir, caller, callee)
+                    prepend_error_from_ktest(
+                        self.symmains_bc, callee, kteststoprepend,
+                        prepended_bcfile)
+                    optimize_redundant_globals(prepended_bcfile)
+
                     pool.apply_async(thread_phase_two, (
-                        resultlist, caller, callee, self.prepend_bc,
+                        resultlist, caller, callee, prepended_bcfile,
                         self.get_next_klee_directory(
                             dict(phase=phase, caller=caller, callee=callee)),
                         self.flags_user, self.posixflags, self.posix4main
@@ -394,21 +408,16 @@ class Macke:
         """
         Extract and register the results of a completed KLEE run
         """
+        # Put all found errors into the error registry
+        self.errorregistry.create_from_dir(
+            kleedone.outdir, kleedone.analyzedfunc)
+
         # Just give it a shorter name
         k = kleedone
 
         # fill some counters
         self.testcases += k.testcount
-        self.errfunccount += (
-            k.errorcount != 0 and not self.errorkleeruns.get(k.analyzedfunc))
         self.errtotalcount += k.errorcount
-
-        # Check for termination reasons
-        if "KLEE: WATCHDOG: time expired" in k.stdoutput:
-            self.timeout += 1
-
-        if "LLVM ERROR: not enough shared memory" in k.stdoutput:
-            self.outofmemory += 1
 
         # Create an empty entry, if function is not inside the map
         if k.analyzedfunc not in self.errorkleeruns:
@@ -447,3 +456,11 @@ class Macke:
         # Longest chains are reported first
         result.sort(key=lambda x: (len(x), x[0]), reverse=True)
         return result
+
+
+def get_chain_segment_bcname(bcdir, caller, callee):
+    """
+    Build the path and name of a bc-file with prepended errors of callee
+    """
+    # "-" is a good separator, because "-" is not allowed in c function names
+    return path.join(bcdir, "chain-%s-%s.bc" % (caller, callee))
