@@ -98,14 +98,9 @@ def execute_klee(
         # If something went wrong, we still read the output for analysis
         out = cperr.output.decode("utf-8", 'ignore')
 
-        # Some errors are expected and should not be reported
-        if not any(reason in out for reason in [
-                "LLVM ERROR: not enough shared memory",
-                "KLEE: WATCHDOG: time expired"]):
-            # throw the error to the command line
-            print()  # Empty line to seperate from previous output
-            print("Error during:", command)
-            print(out)
+    # Store all the output in a textfile inside the klee directory
+    with open(path.join(outdir, "output.txt"), 'w') as f:
+        f.write(out)
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
