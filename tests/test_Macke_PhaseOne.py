@@ -16,7 +16,7 @@ class TestMackePhaseOne(unittest.TestCase):
         m = self.run_macke_test_on_file("examples/divisible.bc")
 
         self.assertEqual(m.testcases, 10)
-        self.assertEqual(m.errtotalcount, 0)
+        self.assertEqual(m.errorregistry.errorcounter, 0)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
         # All entries in the map should be empty
@@ -26,7 +26,7 @@ class TestMackePhaseOne(unittest.TestCase):
         m = self.run_macke_test_on_file("examples/not42.bc")
 
         self.assertEqual(m.testcases, 2)
-        self.assertEqual(m.errtotalcount, 1)
+        self.assertEqual(m.errorregistry.errorcounter, 1)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 1)
 
         self.assertEqual(len(m.errorkleeruns), 1)
@@ -36,7 +36,7 @@ class TestMackePhaseOne(unittest.TestCase):
         m = self.run_macke_test_on_file("examples/main.bc")
 
         self.assertEqual(m.testcases, 0)
-        self.assertEqual(m.errtotalcount, 0)
+        self.assertEqual(m.errorregistry.errorcounter, 0)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
         self.assertEqual(m.errorkleeruns, {})
@@ -47,7 +47,7 @@ class TestMackePhaseOne(unittest.TestCase):
         # 2 for f2, 3 for f3 and sum of both for f1
         self.assertEqual(m.testcases, 10)
         # 3 for f1, 1 for f2, 2 for f3
-        self.assertEqual(m.errtotalcount, 6)
+        self.assertEqual(m.errorregistry.errorcounter, 6)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 3)
 
         self.assertEqual(len(m.errorkleeruns), 3)

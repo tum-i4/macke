@@ -5,10 +5,10 @@ from macke.Macke import Macke
 
 class TestMackePhaseTwo(unittest.TestCase):
 
-    def run_macke_test_on_file(self, bcfile):
+    def run_macke_test_on_file(self, bcfile, excludes_in_phase_two):
         m = Macke(
             bcfile, quiet=True, flags_user=["--max-time=60"],
-            exclude_known_from_phase_two=False)
+            exclude_known_from_phase_two=excludes_in_phase_two)
         m.run_initialization()
         m.run_phase_one()
         m.run_phase_two()
@@ -16,7 +16,7 @@ class TestMackePhaseTwo(unittest.TestCase):
         return m
 
     def test_with_small(self):
-        m = self.run_macke_test_on_file("examples/small.bc")
+        m = self.run_macke_test_on_file("examples/small.bc", False)
 
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 3)
 
@@ -36,7 +36,7 @@ class TestMackePhaseTwo(unittest.TestCase):
         self.assertEqual(len(m.errorkleeruns['f3']), 1)
 
     def test_with_chain(self):
-        m = self.run_macke_test_on_file("examples/chain.bc")
+        m = self.run_macke_test_on_file("examples/chain.bc", False)
 
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 4)
 
@@ -51,3 +51,9 @@ class TestMackePhaseTwo(unittest.TestCase):
         self.assertEqual(len(m.errorkleeruns['c2']), 2)
         self.assertEqual(len(m.errorkleeruns['c3']), 2)
         self.assertEqual(len(m.errorkleeruns['c4']), 1)
+
+    def test_with_sanatized(self):
+        m = self.run_macke_test_on_file("examples/sanatized.bc", True)
+
+        self.assertEqual(m.errorregistry.count_functions_with_errors(), 2)
+        self.assertEqual(m.kleecount, 4 + 1)

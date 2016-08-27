@@ -21,7 +21,7 @@ class TestMackeWithMain(unittest.TestCase):
         m = self.run_macke_test_on_file("examples/justmain.bc")
 
         self.assertEqual(m.testcases, 2)
-        self.assertEqual(m.errtotalcount, 1)
+        self.assertEqual(m.errorregistry.errorcounter, 1)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 1)
 
     def test_with_chain(self):
