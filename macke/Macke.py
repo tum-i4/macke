@@ -76,16 +76,8 @@ class Macke:
         # Initialize some statistic counter
         self.testcases = 0
 
-        # Map of function -> [kleeruns triggering an error]
-        self.errorkleeruns = {}
-
-        # Information about the error chains
-        self.errorchains = dict()
-        self.errorchainheads = set()
-
         # Some attributes, that are filled later
         self.callgraph = None
-        self.chainsfrommain = 0
         self.starttimephase2 = None
         self.endtime = None
         self.errorregistry = ErrorRegistry()
@@ -173,10 +165,6 @@ class Macke:
         tasks = self.callgraph.list_symbolic_encapsulable(
             removemain=not bool(self.posix4main))
 
-        # Fill storage for errors in klee runs with all suitable functions
-        for task in tasks:
-            self.errorkleeruns[task] = list()
-
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
@@ -235,11 +223,6 @@ class Macke:
         if not self.quiet:
             bar.finish()
 
-        self.errorchains = self.reconstruct_error_chains()
-        self.chainsfrommain = (sum(1 for c in self.errorchains if (
-            len(c) > 1 and path.dirname(c[0]) in self.errorkleeruns['main']))
-            if 'main' in self.errorkleeruns else 0)
-
         self.qprint("Phase 2: %d additional KLEE analyzes propagate %d "
                     "errors" % (qualified - totallyskipped,
                                 self.errorregistry.mackerrorcounter))
@@ -268,15 +251,6 @@ class Macke:
             info["start"] = self.starttime.isoformat()
             info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
-
-            """
-            info["testcases"] = self.testcases
-            info["numberOfFunctionsWithErrors"] = self.errfunccount
-            info["functionToKleeRunWithErrorMap"] = OrderedDict(
-                sorted(self.errorkleeruns.items(), key=lambda t: t[0]))
-            info["errorchains"] = self.errorchains
-            info["chainsfrommain"] = self.chainsfrommain
-            """
 
             json.dump(info, f)
 
@@ -406,49 +380,8 @@ class Macke:
         self.errorregistry.create_from_dir(
             kleedone.outdir, kleedone.analyzedfunc)
 
-        # Just give it a shorter name
-        k = kleedone
-
-        # fill some counters
-        self.testcases += k.testcount
-
-        # Create an empty entry, if function is not inside the map
-        if k.analyzedfunc not in self.errorkleeruns:
-            self.errorkleeruns[k.analyzedfunc] = []
-
-        # store runs uncovering errors for phase two
-        if k.errorcount != 0:
-            self.errorkleeruns[k.analyzedfunc].append(k.outdir)
-
-        # All new errors are potential heads of error chains
-        for errfile in k.errfiles:
-            self.errorchainheads.add(errfile)
-
-        # store all error chains
-        for new, old in k.chained:
-            self.errorchains[new] = old
-            # the old error is no longer a head
-            if old in self.errorchainheads:
-                self.errorchainheads.remove(old)
-
-    def reconstruct_error_chains(self):
-        """
-        Unfold the compact internal representation to a list of error chains
-        """
-        result = []
-
-        for head in self.errorchainheads:
-            chain = [head]
-            probe = head
-            while probe in self.errorchains:
-                probe = self.errorchains[probe]
-                chain.append(probe)
-            if len(chain) > 1:
-                result.append(chain)
-
-        # Longest chains are reported first
-        result.sort(key=lambda x: (len(x), x[0]), reverse=True)
-        return result
+        # Count the total number of test cases
+        self.testcases += kleedone.testcount
 
 
 def get_chain_segment_bcname(bcdir, caller, callee):

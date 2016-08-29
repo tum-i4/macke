@@ -19,9 +19,6 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errorregistry.errorcounter, 0)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
-        # All entries in the map should be empty
-        self.assertEqual(sum(len(v) for _, v in m.errorkleeruns.items()), 0)
-
     def test_with_one_asserts(self):
         m = self.run_macke_test_on_file("examples/not42.bc")
 
@@ -29,8 +26,8 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errorregistry.errorcounter, 1)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 1)
 
-        self.assertEqual(len(m.errorkleeruns), 1)
-        self.assertEqual(len(m.errorkleeruns['not42']), 1)
+        self.assertEqual(len(m.errorregistry.forfunction), 1)
+        self.assertEqual(len(m.errorregistry.forfunction['not42']), 1)
 
     def test_main_generates_no_testcases(self):
         m = self.run_macke_test_on_file("examples/main.bc")
@@ -39,7 +36,7 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errorregistry.errorcounter, 0)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 0)
 
-        self.assertEqual(m.errorkleeruns, {})
+        self.assertEqual(m.errorregistry.forfunction, {})
 
     def test_with_several_asserts(self):
         m = self.run_macke_test_on_file("examples/small.bc")
@@ -50,7 +47,7 @@ class TestMackePhaseOne(unittest.TestCase):
         self.assertEqual(m.errorregistry.errorcounter, 6)
         self.assertEqual(m.errorregistry.count_functions_with_errors(), 3)
 
-        self.assertEqual(len(m.errorkleeruns), 3)
-        self.assertEqual(len(m.errorkleeruns['f1']), 1)
-        self.assertEqual(len(m.errorkleeruns['f2']), 1)
-        self.assertEqual(len(m.errorkleeruns['f3']), 1)
+        self.assertEqual(len(m.errorregistry.forfunction), 3)
+        self.assertEqual(len(m.errorregistry.forfunction['f1']), 3)
+        self.assertEqual(len(m.errorregistry.forfunction['f2']), 1)
+        self.assertEqual(len(m.errorregistry.forfunction['f3']), 2)

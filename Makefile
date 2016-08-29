@@ -19,7 +19,8 @@ dev: venv
 .PHONY: test
 test: venv examples/chain.bc examples/divisible.bc examples/doomcircle.bc \
 		examples/factorial.bc examples/justmain.bc examples/main.bc \
-		examples/not42.bc examples/sanatized.bc examples/small.bc
+		examples/not42.bc examples/sanatized.bc examples/small.bc \
+		examples/split.bc
 	.venv/bin/python -m unittest
 
 # Initialize the virtual environment, if needed

@@ -26,12 +26,18 @@ class CallGraph:
     def __getitem__(self, key):
         return self.graph[key]
 
-    def list_symbolic_encapsulable(self, removemain=True):
+    def is_symbolic_encapsulable(self, function):
         """
-        Returns a sort of inverted topologically ordered list of all function
-        names, that can be symbolically encapsulated by MACKE
+        Checks, if a function can be encapsulated symbolically
         """
+        return (not self[function]['hasdoubleptrarg'] and
+                not self[function]['isexternal'] and
+                not self[function]['isexternal'])
 
+    def get_flattened_inverted_topology(self):
+        """
+        Returns a sort of inverted topologically ordered list of all functions
+        """
         # Nested lists of circles and SCCs are simply flattened
         flattened = []
         for topo in self.topology:
@@ -39,10 +45,16 @@ class CallGraph:
                 flattened.append(topo)
             else:
                 flattened.extend(topo)
+        return flattened
 
-        return [t for t in flattened if (not self[t]['hasfuncptrarg'] and (
-            not self[t]['hasdoubleptrarg'] or (not removemain and t == "main"))
-        )]
+    def list_symbolic_encapsulable(self, removemain=True):
+        """
+        Returns a sort of inverted topologically ordered list of all function
+        names, that can be symbolically encapsulated by MACKE
+        """
+        flattened = self.get_flattened_inverted_topology()
+        return [t for t in flattened if (self.is_symbolic_encapsulable(t) or (
+                                         not removemain and t == "main"))]
 
     def group_independent_calls(self, removemain=True):
         """
@@ -63,9 +75,7 @@ class CallGraph:
             for callee in unit:
                 for caller in self[callee]['calledby']:
                     if ((not removemain and caller == "main") or
-                            (not self[caller]['hasdoubleptrarg'] and
-                             not self[caller]['isexternal'] and
-                             not self[callee]['isexternal'])):
+                            (self.is_symbolic_encapsulable(caller))):
                         pairs.append((caller, callee))
             if pairs:
                 result.append(sorted(pairs))

@@ -1,6 +1,6 @@
 import unittest
 
-from macke.ErrorRegistry import (
+from macke.Error import (
     get_corresponding_ktest, get_reason_for_error, get_vulnerable_instruction)
 
 
