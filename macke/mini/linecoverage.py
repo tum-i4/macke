@@ -1,15 +1,14 @@
 """
-Generate a json file with all runtime information inside a Macke run directory
+Generate a json file with line coverage information about a MACKE run
 """
 
-from .helper import parse_mackedir
+from .helper import generic_main
 from ..llvm_wrapper import extract_lines_of_code
 from ..run_istats import extract_linecoverage
 
 from collections import OrderedDict
 import json
 from os import path
-from pprint import pprint
 
 
 def linecoverage(macke_directory):
@@ -19,7 +18,8 @@ def linecoverage(macke_directory):
         klees = json.load(klee_json)
 
     # Extract all lines of code in the unoptimized program
-    funcovs = extract_lines_of_code(path.join(macke_directory, "program.bc"))
+    funcovs = extract_lines_of_code(
+        path.join(macke_directory, "bitcode", "program.bc"))
 
     # Collect all covered and uncovered lines from all run.istats
     istats = dict()
@@ -45,11 +45,12 @@ def linecoverage(macke_directory):
             if function not in perfunction:
                 perfunction[function] = dict()
             perfunction[function][file] = OrderedDict([
-                ('covered', sorted(list(set(lines) & istats[file]['covered']))),
+                ('covered', sorted(list(
+                    set(lines) & istats[file]['covered']))),
                 ('uncovered', sorted(list(
                     set(lines) & istats[file]['uncovered']))),
-                ('removed', sorted(list(set(lines)
-                    - istats[file]['covered'] - istats[file]['uncovered'])))
+                ('removed', sorted(list(set(lines) - istats[file]['covered'] -
+                                        istats[file]['uncovered'])))
             ])
 
     # Count the absolute numbers
@@ -61,24 +62,24 @@ def linecoverage(macke_directory):
             removed += len(status['removed'])
 
     # Compose everything in a sorted result
-    result = OrderedDict([('total', OrderedDict([
+    result = OrderedDict([('total', OrderedDict(
+        [
             ('covered', covered),
             ('uncovered', uncovered),
-            ('removed', removed)])
-        ),
+            ('removed', removed)
+        ])),
         ('perfunction', OrderedDict(
             sorted(perfunction.items(), key=lambda t: t[0])))
     ])
-
-    coverage_json = path.join(macke_directory, "coverage.json")
-    with open(coverage_json, 'w') as f:
-        json.dump(result, f)
-
-    print("The coverage analysis was stored in", coverage_json)
+    return result
 
 
 def main():
-    linecoverage(parse_mackedir("Extract line coverage of a MACKE run"))
+    generic_main(
+        "Extract line coverage of a MACKE run",
+        "The coverage analysis was stored in %s",
+        "coverage.json", linecoverage
+    )
 
 if __name__ == '__main__':
     main()
