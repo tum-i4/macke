@@ -16,6 +16,17 @@ class TestErrorChain(unittest.TestCase):
         m.delete_directory()
         return m
 
+    def test_with_not42(self):
+        m = self.run_macke_test_on_file("examples/not42.bc")
+        chains = reconstruct_all_error_chains(m.errorregistry, m.callgraph)
+
+        # Only one reason for the chain
+        self.assertEqual(len(chains), 1)
+
+        # Only one chain trough all functions
+        self.assertEqual(
+            next(iter(chains.values())), [['not42']])
+
     def test_with_chain(self):
         m = self.run_macke_test_on_file("examples/chain.bc")
         chains = reconstruct_all_error_chains(m.errorregistry, m.callgraph)
