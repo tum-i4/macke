@@ -6,21 +6,7 @@ from os import listdir, path
 import re
 import subprocess
 from .config import KLEEBIN
-from .constants import ERRORFILEEXTENSIONS
-
-KLEEFLAGS = [
-    "--allow-external-sym-calls",
-    "--istats-write-interval=3600",
-    "--libc=uclibc",
-    "--max-memory=1000",
-    "--only-output-states-covering-new",
-    "--optimize",
-    # "--output-module",  # Helpful for debugging
-    "--output-source=false",  # Removing this is helpful for debugging
-    "--posix-runtime",
-    "--stats-write-interval=3600",
-    "--watchdog"
-]
+from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
 
 
 class KleeResult:
