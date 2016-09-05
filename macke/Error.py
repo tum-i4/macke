@@ -2,8 +2,11 @@
 Storage wrapper for Errors found by KLEE
 """
 from os import path
+from collections import OrderedDict
+from functools import total_ordering
 
 
+@total_ordering
 class Error:
     """
     Container class for all information about errors found by KLEE
@@ -25,6 +28,17 @@ class Error:
         # Store an identifier for the vulnerable instruction "file:line"
         self.vulnerableInstruction = get_vulnerable_instruction(errfile)
 
+    def __eq__(self, other):
+        return ((self.entryfunction, self.errfile, self.reason,
+                 self.vulnerableInstruction) == (other.entryfunction,
+                                                 other.errfile, other.reason,
+                                                 other.vulnerableInstruction))
+
+    def __lt__(self, other):
+        return ((self.vulnerableInstruction, self.entryfunction,
+                 self.errfile) < (other.vulnerableInstruction,
+                                  other.entryfunction, other.errfile))
+
     def __str__(self):
         return "<%s, %s, %s, %s>" % (
             self.entryfunction, self.errfile, self.reason,
@@ -34,6 +48,15 @@ class Error:
         return "<macke.Error.Error object: %s, %s, %s, %s>" % (
             self.entryfunction, self.errfile, self.reason,
             self.vulnerableInstruction)
+
+    def as_ordered_dict(self):
+        return OrderedDict([
+            ("entryfunction", self.entryfunction),
+            ("errfile", self.errfile),
+            ("ktestfile", self.ktestfile),
+            ("reason", self.reason),
+            ("vulnerableInstruction", self.vulnerableInstruction),
+        ])
 
 
 def get_corresponding_ktest(errfile):

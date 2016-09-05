@@ -21,6 +21,7 @@ setup(
             'macke-functions = macke.analyse.functions:main',
             'macke-linecoverage = macke.analyse.linecoverage:main',
             'macke-runtime = macke.analyse.runtime:main',
+            'macke-vulninst = macke.analyse.vulninst:main',
         ]
     },
     classifiers=[
