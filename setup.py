@@ -18,6 +18,7 @@ setup(
         'console_scripts': [
             'macke = macke.__main__:main',
             'macke-analyze = macke.analyse.everything:main',
+            'macke-functions = macke.analyse.functions:main',
             'macke-linecoverage = macke.analyse.linecoverage:main',
             'macke-runtime = macke.analyse.runtime:main',
         ]

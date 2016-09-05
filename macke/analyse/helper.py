@@ -1,7 +1,7 @@
 """
 Some helping functions to reduce the duplicate code for stand alone evaluation
 """
-
+from ..ErrorRegistry import ErrorRegistry
 import argparse
 from os import path
 import json
@@ -36,6 +36,22 @@ def store_as_json(macke_directory, filename, content):
     jsonfile = path.join(macke_directory, filename)
     with open(jsonfile, 'w') as f:
         json.dump(content, f)
+
+
+def get_error_registry_for_mackedir(macke_directory):
+    registry = ErrorRegistry()
+
+    klees = dict()
+    with open(path.join(macke_directory, 'klee.json')) as klee_json:
+        klees = json.load(klee_json)
+
+    for _, klee in klees.items():
+        if "function" in klee:
+            registry.create_from_dir(klee['folder'], klee['function'])
+        else:
+            registry.create_from_dir(klee['folder'], klee['caller'])
+
+    return registry
 
 
 def generic_main(description, feedback, filename, callback):
