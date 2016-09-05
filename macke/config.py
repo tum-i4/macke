@@ -10,9 +10,9 @@ CONFIG = configparser.ConfigParser()
 CONFIGFILE = path.join(path.dirname(__file__), "..", "config.ini")
 CONFIG.read(CONFIGFILE)
 
-LIBMACKEOPT = CONFIG.get("binaries", "libmackeopt")
-LLVMOPT = CONFIG.get("binaries", "llvmopt", fallback="opt")
-KLEEBIN = CONFIG.get("binaries", "klee", fallback="klee")
+LIBMACKEOPT = path.expanduser(CONFIG.get("binaries", "libmackeopt"))
+LLVMOPT = path.expanduser(CONFIG.get("binaries", "llvmopt", fallback="opt"))
+KLEEBIN = path.expanduser(CONFIG.get("binaries", "klee", fallback="klee"))
 THREADNUM = CONFIG.getint("runtime", "threadnum", fallback=None)
 
 
