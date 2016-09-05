@@ -13,7 +13,9 @@ import sys
 from time import sleep
 from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
-from .config import CONFIGFILE, THREADNUM, get_current_git_hash
+from .config import (
+    CONFIGFILE, THREADNUM,
+    get_current_git_hash, get_llvm_opt_git_hash, get_klee_git_hash)
 from .ErrorRegistry import ErrorRegistry
 from .threads import thread_phase_one, thread_phase_two
 from .llvm_wrapper import (
@@ -139,6 +141,8 @@ class Macke:
         with open(path.join(self.rundir, "info.json"), 'w') as f:
             info = OrderedDict()
             info["macke-git-version-hash"] = get_current_git_hash()
+            info["llvm-opt-git-version-hash"] = get_llvm_opt_git_hash()
+            info["klee-git-version-hash"] = get_klee_git_hash()
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
             info["run-argv"] = sys.argv
             info["comment"] = self.comment

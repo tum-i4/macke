@@ -69,10 +69,38 @@ def check_config():
         raise Exception("Config: Invalid Number of threads")
 
 
+def get_current_git_hash_from(directory):
+    """
+    Returns the git hash of the currently checked out commit in directory
+    """
+    try:
+        githash = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=directory,
+            stderr=subprocess.DEVNULL).decode("utf-8").rstrip()
+    except subprocess.CalledProcessError:
+        githash = "unknown"
+
+    return githash
+
+
 def get_current_git_hash():
     """
     Returns the git hash of the currently checked out commit
     """
-    return subprocess.check_output(
-        ['git', 'rev-parse', 'HEAD'],
-        cwd=path.join(path.dirname(__file__), "..")).decode("utf-8").rstrip()
+    return get_current_git_hash_from(path.join(path.dirname(__file__), ".."))
+
+
+def get_llvm_opt_git_hash():
+    """
+    Tries to get the git hash of currently checket out version of
+    macke-llvm-opt, if the binary is inside the git repository
+    """
+    return get_current_git_hash_from(path.dirname(LIBMACKEOPT))
+
+
+def get_klee_git_hash():
+    """
+    Tries to get the git hash of currently checket out version of klee,
+    if the binary is inside the git repository
+    """
+    return get_current_git_hash_from(path.dirname(KLEEBIN))
