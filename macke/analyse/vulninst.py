@@ -15,7 +15,7 @@ def vulninst(macke_directory):
         vulninstdict[vulninst] = []
         for error in sorted(errors):
             odict = error.as_ordered_dict()
-            del odict['vulnerableInstruction']
+            odict.pop('vulnerableInstruction', None)
             vulninstdict[vulninst].append(odict)
 
     result = OrderedDict([
