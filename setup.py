@@ -17,6 +17,7 @@ setup(
     entry_points={
         'console_scripts': [
             'macke = macke.__main__:main',
+            'macke-analyze = macke.analyse.everything:main',
             'macke-linecoverage = macke.analyse.linecoverage:main',
             'macke-runtime = macke.analyse.runtime:main',
         ]
