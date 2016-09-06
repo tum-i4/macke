@@ -2,7 +2,10 @@
 All interactions with KLEE
 """
 
+from collections import OrderedDict
 from os import listdir, path
+import json
+import operator
 import re
 import subprocess
 from .config import KLEEBIN
@@ -47,6 +50,62 @@ class KleeResult:
 
     def __str__(self):
         return "KLEE in %s: %s" % (self.outdir, self.stdoutput)
+
+    def get_outname(self):
+        """ Get the directory name of the KLEE output directory """
+        return path.basename(self.outdir)
+
+    def did_klee_crash(self):
+        """ checks, if KLEE crashs during this analysis """
+        return "llvm::sys::PrintStackTrace" in self.stdoutput
+
+    def did_klee_run_out_of_time(self):
+        """ checks, if KLEE runs out of time during the analysis """
+        return any(message in self.stdoutput for message in [
+            "KLEE: WATCHDOG: time expired",
+            "KLEE: WARNING: max-instruction-time exceeded",
+            "KLEE: HaltTimer invoked",
+        ])
+
+    def did_klee_run_out_of_memory(self):
+        """ checks, if KLEE runs """
+        return any(message in self.stdoutput for message in [
+            "not enough shared memory for counterexample",
+            "Memory limit exceeded.",
+            "states (over memory cap)",
+            "skipping fork (memory cap exceeded)",
+        ])
+
+
+def reconstruct_from_macke_dir(mackedir):
+    """ Reconstruct all KLEE objects of a MACKE run """
+    return reconstruct_from_klee_json(path.join(mackedir, "klee.json"))
+
+
+def reconstruct_from_klee_json(kleejson):
+    """ Reconstruct all KLEE objects mentioned in a klee.json """
+    assert kleejson.endswith("klee.json")
+
+    klees = OrderedDict()
+    with open(kleejson, 'r') as jsonfile:
+        klees = json.load(jsonfile)
+
+    result = []
+    for _, kinfo in sorted(klees.items(), key=operator.itemgetter(0)):
+        # Read the KLEE's output
+        stdoutput = ""
+        with open(path.join(kinfo["folder"], "output.txt"), 'r') as out:
+            stdoutput = out.read()
+
+        # Build a new KLEE object for the result list
+        result.append(KleeResult(
+            kinfo["bcfile"],
+            kinfo["function"] if "function" in kinfo else kinfo["caller"],
+            kinfo["folder"],
+            stdoutput
+        ))
+
+    return result
 
 
 def execute_klee(

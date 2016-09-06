@@ -2,26 +2,27 @@
 Extract all KLEE runs, that crashes
 """
 from .helper import generic_main
+from ..Klee import reconstruct_from_macke_dir
 from collections import OrderedDict
 import json
-import operator
 from os import path
 
 
 def kleecrash(macke_directory):
-    klees = dict()
+    klees = reconstruct_from_macke_dir(macke_directory)
+
+    kinfo = dict()
     with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        klees = json.load(klee_json)
+        kinfo = json.load(klee_json)
 
     result = []
-    for _, kinfo in sorted(klees.items(), key=operator.itemgetter(0)):
-        with open(path.join(kinfo['folder'], "output.txt"), 'r') as output:
-            content = output.read()
-            if "llvm::sys::PrintStackTrace" in content:
-                kresult = OrderedDict(sorted(
-                    kinfo.items(), key=lambda t: t[0]))
-                kresult["output"] = content
-                result.append(kresult)
+    for klee in klees:
+        if klee.did_klee_crash():
+            kresult = OrderedDict(sorted(
+                kinfo[klee.get_outname()].items(), key=lambda t: t[0]))
+            del kresult["bcfile"]
+            kresult["output"] = klee.stdoutput
+            result.append(kresult)
 
     return result
 

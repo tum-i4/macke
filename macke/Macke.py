@@ -341,7 +341,8 @@ class Macke:
                 pool.apply_async(thread_phase_one, (
                     resultlist, function, self.symmains_bc,
                     self.get_next_klee_directory(
-                        dict(phase=phase, function=function)),
+                        dict(phase=phase, bcfile=self.symmains_bc,
+                             function=function)),
                     self.flags_user, self.posixflags, self.posix4main
                 ))
             # You cannot skip anything in phase one -> 0 skips
@@ -362,7 +363,8 @@ class Macke:
                     pool.apply_async(thread_phase_two, (
                         resultlist, caller, callee, prepended_bcfile,
                         self.get_next_klee_directory(
-                            dict(phase=phase, caller=caller, callee=callee)),
+                            dict(phase=phase, bcfile=prepended_bcfile,
+                                 caller=caller, callee=callee)),
                         self.flags_user, self.posixflags, self.posix4main
                     ))
                 else:
