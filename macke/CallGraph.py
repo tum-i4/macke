@@ -130,3 +130,10 @@ class CallGraph:
             units.append(list(independent))
 
         return units
+
+    def get_functions_without_any_caller(self):
+        """
+        Returns a set with all functions, that do not have any caller
+        """
+        return {func for func in self.get_flattened_inverted_topology()
+                if not self[func]["calledby"]}
