@@ -59,6 +59,16 @@ class Error:
         ])
 
 
+def get_corresponding_kleedir(errfile):
+    """ Get the path of the corresponding klee directory """
+    return path.dirname(errfile)
+
+
+def get_corresponding_kleedir_name(errfile):
+    """ Get the name of the corresponding klee directory """
+    return path.basename(path.dirname(errfile))
+
+
 def get_corresponding_ktest(errfile):
     """ Get the corresponding ktest file for a .err file """
     assert errfile.endswith(".err")

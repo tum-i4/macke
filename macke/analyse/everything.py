@@ -1,6 +1,7 @@
 """
 One main function, that just calls all analysis
 """
+from .chains import main as chains
 from .helper import arg_parse_mackedir
 from .functions import main as functions
 from .kleecrash import main as kleecrash
@@ -14,6 +15,7 @@ def main():
     arg_parse_mackedir("Adds lots of analyzes to a MACKE directory")
 
     # Just call all mains from all analyzes scripts
+    chains()
     functions()
     kleecrash()
     linecoverage()
