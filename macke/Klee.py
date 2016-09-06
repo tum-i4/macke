@@ -76,6 +76,10 @@ class KleeResult:
             "skipping fork (memory cap exceeded)",
         ])
 
+    def did_klee_reach_error_summary(self, callee):
+        """ checks, if the KLEE run reaches the error summary of callee """
+        return "MACKE: Summery for %s reached" % callee in self.stdoutput
+
 
 def reconstruct_from_macke_dir(mackedir):
     """ Reconstruct all KLEE objects of a MACKE run """
