@@ -1,20 +1,19 @@
 """
 Details about the error chains found by a MACKE run
 """
-from .helper import get_error_registry_for_mackedir, generic_main
+from .helper import (
+    get_error_registry_for_mackedir, get_klee_registry_from_mackedir,
+    generic_main)
 from ..CallGraph import CallGraph
 from ..Error import get_corresponding_kleedir_name
 from ..ErrorChain import reconstruct_all_error_chains
 from collections import OrderedDict
 from statistics import mean, stdev
 from os import path
-import json
 
 
 def chains(macke_directory):
-    klees = dict()
-    with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        klees = json.load(klee_json)
+    klees = get_klee_registry_from_mackedir(macke_directory)
 
     registry = get_error_registry_for_mackedir(macke_directory)
     cg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))

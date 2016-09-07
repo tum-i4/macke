@@ -38,12 +38,17 @@ def store_as_json(macke_directory, filename, content):
         json.dump(content, f)
 
 
+def get_klee_registry_from_mackedir(macke_directory):
+    kinfo = dict()
+    with open(path.join(macke_directory, 'klee.json')) as klee_json:
+        kinfo = json.load(klee_json)
+
+    return kinfo
+
+
 def get_error_registry_for_mackedir(macke_directory):
     registry = ErrorRegistry()
-
-    klees = dict()
-    with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        klees = json.load(klee_json)
+    klees = get_klee_registry_from_mackedir(macke_directory)
 
     for _, klee in klees.items():
         if "function" in klee:

@@ -6,6 +6,7 @@ from .helper import arg_parse_mackedir
 from .functions import main as functions
 from .kleecrash import main as kleecrash
 from .linecoverage import main as linecoverage
+from .partial import main as partial
 from .runtime import main as runtime
 from .vulninst import main as vulninst
 
@@ -19,6 +20,7 @@ def main():
     functions()
     kleecrash()
     linecoverage()
+    partial()
     runtime()
     vulninst()
 

@@ -1,19 +1,15 @@
 """
 Extract all KLEE runs, that crashes
 """
-from .helper import generic_main
+from .helper import get_klee_registry_from_mackedir, generic_main
 from ..Klee import reconstruct_from_macke_dir
 from collections import OrderedDict
-import json
-from os import path
 
 
 def kleecrash(macke_directory):
     klees = reconstruct_from_macke_dir(macke_directory)
 
-    kinfo = dict()
-    with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        kinfo = json.load(klee_json)
+    kinfo = get_klee_registry_from_mackedir(macke_directory)
 
     result = []
     for klee in klees:

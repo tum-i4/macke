@@ -2,10 +2,8 @@
 Generate a json file with all runtime information inside a Macke run directory
 """
 
-from .helper import generic_main
-
+from .helper import get_klee_registry_from_mackedir, generic_main
 from collections import OrderedDict
-import json
 from os import path
 
 
@@ -15,9 +13,7 @@ def analyse_runtime(macke_directory):
     """
 
     # Read klee.json information
-    klees = dict()
-    with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        klees = json.load(klee_json)
+    klees = get_klee_registry_from_mackedir(macke_directory)
 
     result = OrderedDict()
     result['total'] = 0

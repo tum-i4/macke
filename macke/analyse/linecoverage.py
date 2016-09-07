@@ -2,20 +2,17 @@
 Generate a json file with line coverage information about a MACKE run
 """
 
-from .helper import generic_main
+from .helper import get_klee_registry_from_mackedir, generic_main
 from ..llvm_wrapper import extract_lines_of_code
 from ..run_istats import extract_linecoverage
 
 from collections import OrderedDict
-import json
 from os import path
 
 
 def linecoverage(macke_directory):
     # Read klee.json information
-    klees = dict()
-    with open(path.join(macke_directory, 'klee.json')) as klee_json:
-        klees = json.load(klee_json)
+    klees = get_klee_registry_from_mackedir(macke_directory)
 
     # Extract all lines of code in the unoptimized program
     funcovs = extract_lines_of_code(

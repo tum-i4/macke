@@ -68,13 +68,20 @@ class KleeResult:
         ])
 
     def did_klee_run_out_of_memory(self):
-        """ checks, if KLEE runs """
+        """ checks, if KLEE runs out of memory during the analysis """
         return any(message in self.stdoutput for message in [
             "not enough shared memory for counterexample",
             "Memory limit exceeded.",
             "states (over memory cap)",
             "skipping fork (memory cap exceeded)",
         ])
+
+    def did_klee_run_out_of_ressources(self):
+        """
+        checks, if KLEE runs out of time or out of memory during the analysis
+        """
+        return (self.did_klee_run_out_of_time() or
+                self.did_klee_run_out_of_memory())
 
     def did_klee_reach_error_summary(self, callee):
         """ checks, if the KLEE run reaches the error summary of callee """
