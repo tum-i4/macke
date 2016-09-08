@@ -8,11 +8,16 @@ def extract_linecoverage(run_istats_file):
     with open(run_istats_file, 'r') as f:
         content = f.readlines()
 
+    # empty files means empty result
+    if not content:
+        return dict()
+
     # Check, if the output format matches the format
-    assert(len(content) > 10)
-    assert(content[0] == 'version: 1\n')
-    assert(content[1] == 'creator: klee\n')
-    assert(content[6] == 'positions: instr line\n')
+    assert ((len(content) > 10) and
+            content[0] == 'version: 1\n' and
+            content[1] == 'creator: klee\n' and
+            content[6] == 'positions: instr line\n'
+            ), "file %s" % run_istats_file
 
     extract = dict()
     currentfile = ""

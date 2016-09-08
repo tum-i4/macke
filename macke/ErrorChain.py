@@ -14,8 +14,15 @@ def reconstruct_all_error_chains(errorregistry, callgraph):
         affected = set({error.entryfunction for error in errorlist})
 
         # Find all heads of the chains
-        chains = ([fun] for fun in affected if not any(
-            call in affected for call in callgraph[fun]['calls']))
+        chains = [[fun] for fun in affected if not any(
+            call in affected for call in callgraph[fun]['calls'])]
+
+        # If we don't find a head for the error, it must be a circle
+        if not chains:
+            # A bit hacky, because we might circles over multiple functions
+            chains = [[fun] for fun in affected if not any(
+                call in affected and call != fun
+                for call in callgraph[fun]['calls'])]
 
         # Extent all chains, until all callers are no longer infected
         for calleelist in callgraph.group_independent_callees():

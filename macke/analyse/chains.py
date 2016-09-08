@@ -42,7 +42,7 @@ def chains(macke_directory):
 
                     if klees[kleedir]['phase'] == 1:
                         endphaseone += 1
-                    else:
+                    elif candidaterror.errfile.endswith(".macke.err"):
                         endphasetwo += 1
 
     result = OrderedDict([
@@ -53,6 +53,7 @@ def chains(macke_directory):
             ("avg", mean(chainlengths)),
             ("std", stdev(chainlengths) if len(chainlengths) > 2 else -1),
         ])),
+        ("longerthanone", len([True for c in chainlengths if c > 1])),
         ("1-level-up", onelevelup),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),

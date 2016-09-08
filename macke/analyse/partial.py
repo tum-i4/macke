@@ -38,6 +38,7 @@ def partial(macke_directory):
     noencapsulation = 0
     outofressources = 0
     targetmissed = 0
+    targetmissednoproblem = 0
     incomplete = 0
 
     for vulninst, errorlist in registry.forvulninst.items():
@@ -54,12 +55,14 @@ def partial(macke_directory):
         border = {(cler, clee) for (cler, clee) in callpairs
                   if cler not in erroneous}
 
-        if all(not kphaseone[cler].did_klee_run_out_of_ressources()
+        if all(cler in kphaseone and
+               not kphaseone[cler].did_klee_run_out_of_ressources()
                for cler, _ in border):
             sanatizedone += 1
         elif all(
-                not kphaseone[cler].did_klee_run_out_of_ressources() or (
-                    not kphasetwo[
+                (cler in kphaseone and
+                 not kphaseone[cler].did_klee_run_out_of_ressources()) or (
+                    (cler, clee) in kphasetwo and not kphasetwo[
                         (cler, clee)].did_klee_run_out_of_ressources() and
                     kphasetwo[(cler, clee)].did_klee_reach_error_summary(clee)
                 ) for cler, clee in border):
@@ -72,22 +75,34 @@ def partial(macke_directory):
             noencapsulation += 1
             isincomplete = True
 
-        if any(kphaseone[cler].did_klee_crash() or
-               kphasetwo[(cler, clee)].did_klee_crash()
+        if any((cler in kphaseone and kphaseone[cler].did_klee_crash()) or
+               ((cler, clee) in kphasetwo and
+                kphasetwo[(cler, clee)].did_klee_crash())
                for cler, clee in border):
             kleecrash += 1
             isincomplete = True
 
-        if any(kphaseone[cler].did_klee_run_out_of_ressources() or
-               kphasetwo[(cler, clee)].did_klee_run_out_of_ressources()
+        if any((cler in kphaseone and
+                kphaseone[cler].did_klee_run_out_of_ressources()) or
+               ((cler, clee) in kphasetwo and
+                kphasetwo[(cler, clee)].did_klee_run_out_of_ressources())
                for cler, clee in border):
             outofressources += 1
             isincomplete = True
 
-        if any(not kphasetwo[(cler, clee)].did_klee_reach_error_summary(clee)
+        if any((cler, clee) in kphasetwo and
+                not kphasetwo[(cler, clee)].did_klee_reach_error_summary(clee)
                for cler, clee in border):
             targetmissed += 1
             isincomplete = True
+
+        if any((cler, clee) in kphasetwo and
+                not kphasetwo[
+                    (cler, clee)].did_klee_run_out_of_ressources() and
+                not kphasetwo[(cler, clee)].did_klee_crash() and
+                not kphasetwo[(cler, clee)].did_klee_reach_error_summary(clee)
+               for cler, clee in border):
+            targetmissednoproblem += 1
 
         incomplete += isincomplete
         complete += not isincomplete
@@ -102,7 +117,8 @@ def partial(macke_directory):
             ("kleecrash", kleecrash),
             ("noencapsulation", noencapsulation),
             ("out-of-resources", outofressources),
-            ("target-missed", targetmissed)
+            ("target-missed", targetmissed),
+            ("target-missed-no-problem", targetmissednoproblem),
         ]))
     ])
 

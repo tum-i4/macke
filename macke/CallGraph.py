@@ -31,7 +31,7 @@ class CallGraph:
         Checks, if a function can be encapsulated symbolically
         """
         return (not self[function]['hasdoubleptrarg'] and
-                not self[function]['isexternal'] and
+                not self[function]['hasfuncptrarg'] and
                 not self[function]['isexternal'])
 
     def get_flattened_inverted_topology(self):
