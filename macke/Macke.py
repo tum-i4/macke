@@ -172,7 +172,7 @@ class Macke:
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
-        self.qprint("Phase 1: Adding new entry points ...", end="")
+        self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
         # Copy the program bc before encapsulating everything symbolically
         shutil.copy2(self.program_bc, self.symmains_bc)
 
@@ -190,7 +190,7 @@ class Macke:
         if not self.quiet:
             bar.finish()
 
-        self.qprint("Phase 1: Found %d errors spread over %d functions" %
+        self.qprint("Phase 1: Found %d KLEE errors spread over %d functions" %
                     (self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
