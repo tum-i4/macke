@@ -15,6 +15,7 @@ def thread_phase_one(
     try:
         resultlist.append(execute_klee(
             symmains_bc, functionname, outdir, flags, posixflags, posix4main))
+    # pylint: disable=broad-except
     except Exception as exc:
         print()
         print("A thread in phase one throws and exception")
@@ -34,6 +35,7 @@ def thread_phase_two(
         resultlist.append(execute_klee_targeted_search(
             prepended_bc, caller, callee, outdir,
             flags, posixflags, posix4main))
+    # pylint: disable=broad-except
     except Exception as exc:
         print()
         print("A thread in phase two throws and exception")

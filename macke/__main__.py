@@ -2,6 +2,7 @@
 Start a complete analysis with the MACKE toolchain on a given bitcode file
 """
 import argparse
+
 from .config import check_config
 from .Macke import Macke
 

@@ -4,9 +4,14 @@ All logic to read informations from KLEE's run.istats file
 
 
 def extract_linecoverage(run_istats_file):
+    """
+    Extract all lines of code, that were mentioned in a run.istats file
+    Result: dict(file: {covered: [lines], uncovered: [lines]})
+    """
+
     content = []
-    with open(run_istats_file, 'r') as f:
-        content = f.readlines()
+    with open(run_istats_file, 'r') as file:
+        content = file.readlines()
 
     # empty files means empty result
     if not content:
@@ -17,7 +22,7 @@ def extract_linecoverage(run_istats_file):
             content[0] == 'version: 1\n' and
             content[1] == 'creator: klee\n' and
             content[6] == 'positions: instr line\n'
-            ), "file %s" % run_istats_file
+           ), "file %s" % run_istats_file
 
     extract = dict()
     currentfile = ""

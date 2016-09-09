@@ -1,7 +1,8 @@
 """
 Registry for Errors found by KLEE
 """
-from os import path, listdir
+from os import listdir, path
+
 from .constants import ERRORFILEEXTENSIONS
 from .Error import Error
 
@@ -24,7 +25,7 @@ class ErrorRegistry:
 
     def create_from_dir(self, kleedir, entryfunction):
         """ register all errors from directory """
-        assert(path.isdir(kleedir))
+        assert path.isdir(kleedir)
 
         for file in listdir(kleedir):
             if any(file.endswith(ext) for ext in ERRORFILEEXTENSIONS):
@@ -50,15 +51,9 @@ class ErrorRegistry:
             add_to_listdict(self.mackeforerrfile, testfrom, error)
 
             # Propagate information about the vulnerable instruction
-            error.vulnerableInstruction = str(preverr.vulnerableInstruction)
+            error.vulnerable_instruction = str(preverr.vulnerable_instruction)
 
-        add_to_listdict(self.forvulninst, error.vulnerableInstruction, error)
-
-    def count_error_test_cases(self):
-        """
-        Count the number of ktests triggering any kind of error
-        """
-        return self.errorcounterr
+        add_to_listdict(self.forvulninst, error.vulnerable_instruction, error)
 
     def count_vulnerable_instructions(self):
         """
@@ -72,7 +67,7 @@ class ErrorRegistry:
         """
         return len(self.forfunction)
 
-    def get_all_vulnerable_instructions_for_function(self, function):
+    def get_all_vulninst_for_func(self, function):
         """
         Returns a set of all vulnerable instructions for a given function
         """
@@ -81,12 +76,11 @@ class ErrorRegistry:
 
         result = set()
         for error in self.forfunction[function]:
-            result.add(error.vulnerableInstruction)
+            result.add(error.vulnerable_instruction)
 
         return result
 
-    def get_errfiles_to_prepend_in_phase_two(
-            self, caller, callee, exclude_known=True):
+    def to_prepend_in_phase_two(self, caller, callee, exclude_known=True):
         """
         Returns a set of .err-files, that should be prepended to callee for the
         analysis from caller. All these ktests belongs to a vulnerable
@@ -95,8 +89,8 @@ class ErrorRegistry:
         if callee not in self.forfunction:
             return set()
 
-        vi_caller = self.get_all_vulnerable_instructions_for_function(caller)
-        vi_callee = self.get_all_vulnerable_instructions_for_function(callee)
+        vi_caller = self.get_all_vulninst_for_func(caller)
+        vi_callee = self.get_all_vulninst_for_func(callee)
 
         vitoprepend = vi_callee
         if exclude_known:
@@ -107,7 +101,7 @@ class ErrorRegistry:
 
         result = set()
         for err in self.forfunction[callee]:
-            if err.vulnerableInstruction in vitoprepend:
+            if err.vulnerable_instruction in vitoprepend:
                 result.add(err.errfile)
 
         return result

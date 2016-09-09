@@ -2,15 +2,19 @@
 Generate a json file with line coverage information about a MACKE run
 """
 
-from .helper import get_klee_registry_from_mackedir, generic_main
-from ..llvm_wrapper import extract_lines_of_code
-from ..run_istats import extract_linecoverage
-
 from collections import OrderedDict
 from os import path
 
+from ..llvm_wrapper import extract_lines_of_code
+from ..run_istats import extract_linecoverage
+from .helper import generic_main, get_klee_registry_from_mackedir
+
 
 def linecoverage(macke_directory):
+    """
+    Extract all linecoverage information in an OrderedDict
+    """
+
     # Read klee.json information
     klees = get_klee_registry_from_mackedir(macke_directory)
 
@@ -59,19 +63,21 @@ def linecoverage(macke_directory):
             removed += len(status['removed'])
 
     # Compose everything in a sorted result
-    result = OrderedDict([('total', OrderedDict(
-        [
-            ('covered', covered),
-            ('uncovered', uncovered),
-            ('removed', removed)
-        ])),
+    result = OrderedDict([
+        ('total', OrderedDict(
+            [
+                ('covered', covered),
+                ('uncovered', uncovered),
+                ('removed', removed)
+            ])),
         ('perfunction', OrderedDict(
-            sorted(perfunction.items(), key=lambda t: t[0])))
+            sorted(perfunction.items(), key=lambda t: t[0]))),
     ])
     return result
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "Extract line coverage of a MACKE run",
         "The coverage analysis was stored in %s",

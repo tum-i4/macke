@@ -2,8 +2,9 @@
 Class container for all call graph operations
 """
 
-from pprint import pformat
 from os import path
+from pprint import pformat
+
 from . import llvm_wrapper
 
 
@@ -54,7 +55,7 @@ class CallGraph:
         """
         flattened = self.get_flattened_inverted_topology()
         return [t for t in flattened if (self.is_symbolic_encapsulable(t) or (
-                                         not removemain and t == "main"))]
+            not removemain and t == "main"))]
 
     def group_independent_calls(self, removemain=True):
         """
@@ -131,7 +132,7 @@ class CallGraph:
 
         return units
 
-    def get_functions_without_any_caller(self):
+    def get_functions_with_no_caller(self):
         """
         Returns a set with all functions, that do not have any caller
         """

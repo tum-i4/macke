@@ -3,23 +3,24 @@ Core class for MACKE execution.
 Contains methods for both phases and some analysis
 """
 
-from collections import OrderedDict
-from datetime import datetime
 import json
-from multiprocessing import Pool, Manager
-from os import makedirs, path, symlink, remove
 import shutil
 import sys
+from collections import OrderedDict
+from datetime import datetime
+from multiprocessing import Manager, Pool
+from os import makedirs, path, remove, symlink
 from time import sleep
+
 from progressbar import ProgressBar, widgets
+
 from .CallGraph import CallGraph
-from .config import (
-    CONFIGFILE, THREADNUM,
-    get_current_git_hash, get_llvm_opt_git_hash, get_klee_git_hash)
+from .config import (CONFIGFILE, THREADNUM, get_current_git_hash,
+                     get_klee_git_hash, get_llvm_opt_git_hash)
 from .ErrorRegistry import ErrorRegistry
+from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
+                           prepend_error_from_ktest)
 from .threads import thread_phase_one, thread_phase_two
-from .llvm_wrapper import (
-    encapsulate_symbolic, optimize_redundant_globals, prepend_error_from_ktest)
 
 # The widgets used by the process bar
 WIDGETS = [
@@ -104,11 +105,11 @@ class Macke:
         outjson = dict()
         outjson[kleeout] = OrderedDict(
             sorted(infojson.items(), key=lambda t: t[0]))
-        with open(self.kleejson, 'a') as f:
+        with open(self.kleejson, 'a') as file:
             # Prepend separator for all but the first entry
             if self.kleecount != 1:
-                f.write(", ")
-            f.write(json.dumps(outjson)[1:-1])
+                file.write(", ")
+            file.write(json.dumps(outjson)[1:-1])
 
         return kleepath
 
@@ -138,7 +139,7 @@ class Macke:
         shutil.copy2(CONFIGFILE, self.rundir)
 
         # Store some basic information about the current run
-        with open(path.join(self.rundir, "info.json"), 'w') as f:
+        with open(path.join(self.rundir, "info.json"), 'w') as file:
             info = OrderedDict()
             info["macke-git-version-hash"] = get_current_git_hash()
             info["llvm-opt-git-version-hash"] = get_llvm_opt_git_hash()
@@ -146,11 +147,11 @@ class Macke:
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
             info["run-argv"] = sys.argv
             info["comment"] = self.comment
-            json.dump(info, f)
+            json.dump(info, file)
 
         # Initialize a file for klee directory mapping
-        with open(self.kleejson, 'w') as f:
-            f.write("{")
+        with open(self.kleejson, 'w') as file:
+            file.write("{")
 
         # Print some information for the user
         self.qprint(
@@ -183,16 +184,16 @@ class Macke:
         self.qprint(" done")
         self.qprint("Phase 1: Performing KLEE runs ...")
 
-        bar = ProgressBar(
+        pbar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
-        self.__execute_in_parallel_threads(tasks, 1, bar)
+        self.__execute_in_parallel_threads(tasks, 1, pbar)
 
         if not self.quiet:
-            bar.finish()
+            pbar.finish()
 
         self.qprint("Phase 1: Found %d KLEE errors spread over %d functions" %
                     (self.errorregistry.errorcounter,
-                        self.errorregistry.count_functions_with_errors()))
+                     self.errorregistry.count_functions_with_errors()))
 
     def run_phase_two(self):
         """
@@ -217,15 +218,15 @@ class Macke:
         self.qprint("Phase 2: Performing KLEE runs with targeted search "
                     "if needed ...")
         totallyskipped = 0
-        bar = ProgressBar(
+        pbar = ProgressBar(
             widgets=WIDGETS, max_value=qualified) if not self.quiet else None
 
         for run in runs:
             # all pairs inside a run can be executed in parallel
-            totallyskipped += self.__execute_in_parallel_threads(run, 2, bar)
+            totallyskipped += self.__execute_in_parallel_threads(run, 2, pbar)
 
         if not self.quiet:
-            bar.finish()
+            pbar.finish()
 
         self.qprint("Phase 2: %d additional KLEE analyzes propagate %d "
                     "errors" % (qualified - totallyskipped,
@@ -245,18 +246,18 @@ class Macke:
                         self.errorregistry.count_functions_with_errors()))
 
         # Close the json of the klee run index file
-        with open(self.kleejson, 'a') as f:
-            f.write("}")
+        with open(self.kleejson, 'a') as file:
+            file.write("}")
 
         # Export all the data gathered so far to a json file
-        with open(path.join(self.rundir, "timing.json"), 'w') as f:
+        with open(path.join(self.rundir, "timing.json"), 'w') as file:
             info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
             info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
 
-            json.dump(info, f)
+            json.dump(info, file)
 
         self.create_macke_last_symlink()
 
@@ -349,7 +350,7 @@ class Macke:
         elif phase == 2:
             for (caller, callee) in run:
                 kteststoprepend = (
-                    self.errorregistry.get_errfiles_to_prepend_in_phase_two(
+                    self.errorregistry.to_prepend_in_phase_two(
                         caller, callee, self.exclude_known_from_phase_two))
 
                 if kteststoprepend:

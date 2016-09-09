@@ -1,12 +1,16 @@
 """
 Extract all KLEE runs, that crashes
 """
-from .helper import get_klee_registry_from_mackedir, generic_main
-from ..Klee import reconstruct_from_macke_dir
 from collections import OrderedDict
+
+from ..Klee import reconstruct_from_macke_dir
+from .helper import generic_main, get_klee_registry_from_mackedir
 
 
 def kleecrash(macke_directory):
+    """
+    Extract all information about KLEE crashes in an OrderedDict
+    """
     klees = reconstruct_from_macke_dir(macke_directory)
 
     kinfo = get_klee_registry_from_mackedir(macke_directory)
@@ -24,6 +28,7 @@ def kleecrash(macke_directory):
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "Extract informations about all KLEE runs that crashes in a MACKE run",
         "The KLEE crashes were stored in %s",

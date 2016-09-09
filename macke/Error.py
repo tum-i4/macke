@@ -1,9 +1,9 @@
 """
 Storage wrapper for Errors found by KLEE
 """
-from os import path
 from collections import OrderedDict
 from functools import total_ordering
+from os import path
 
 
 @total_ordering
@@ -26,36 +26,37 @@ class Error:
         self.reason = get_reason_for_error(errfile)
 
         # Store an identifier for the vulnerable instruction "file:line"
-        self.vulnerableInstruction = get_vulnerable_instruction(errfile)
+        self.vulnerable_instruction = get_vulnerable_instruction(errfile)
 
     def __eq__(self, other):
         return ((self.entryfunction, self.errfile, self.reason,
-                 self.vulnerableInstruction) == (other.entryfunction,
-                                                 other.errfile, other.reason,
-                                                 other.vulnerableInstruction))
+                 self.vulnerable_instruction) ==
+                (other.entryfunction, other.errfile, other.reason,
+                 other.vulnerable_instruction))
 
     def __lt__(self, other):
-        return ((self.vulnerableInstruction, self.entryfunction,
-                 self.errfile) < (other.vulnerableInstruction,
+        return ((self.vulnerable_instruction, self.entryfunction,
+                 self.errfile) < (other.vulnerable_instruction,
                                   other.entryfunction, other.errfile))
 
     def __str__(self):
         return "<%s, %s, %s, %s>" % (
             self.entryfunction, self.errfile, self.reason,
-            self.vulnerableInstruction)
+            self.vulnerable_instruction)
 
     def __repr__(self):
         return "<macke.Error.Error object: %s, %s, %s, %s>" % (
             self.entryfunction, self.errfile, self.reason,
-            self.vulnerableInstruction)
+            self.vulnerable_instruction)
 
     def as_ordered_dict(self):
+        """ Get all informations about this error in an ordered dict """
         return OrderedDict([
             ("entryfunction", self.entryfunction),
             ("errfile", self.errfile),
             ("ktestfile", self.ktestfile),
             ("reason", self.reason),
-            ("vulnerableInstruction", self.vulnerableInstruction),
+            ("vulnerableInstruction", self.vulnerable_instruction),
         ])
 
 

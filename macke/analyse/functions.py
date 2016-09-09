@@ -1,20 +1,23 @@
 """
 Collect information about the functions in program.bc
 """
-from .helper import get_error_registry_for_mackedir, generic_main
-from ..CallGraph import CallGraph
 from collections import OrderedDict
-
 from os import path
+
+from ..CallGraph import CallGraph
+from .helper import generic_main, get_error_registry_for_mackedir
 
 
 def functions(macke_directory):
-    cg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    """
+    Extract all informations about the functions of a program as an OrderedDict
+    """
+    clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
 
-    totalfunccount = sum(1 for _, info in cg.graph.items()
+    totalfunccount = sum(1 for _, info in clg.graph.items()
                          if not info["isexternal"])
-    symenccount = sum(1 for func in cg.graph
-                      if cg.is_symbolic_encapsulable(func))
+    symenccount = sum(1 for func in clg.graph
+                      if clg.is_symbolic_encapsulable(func))
 
     registry = get_error_registry_for_mackedir(macke_directory)
 
@@ -29,6 +32,7 @@ def functions(macke_directory):
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "Collect informations about functions in a MACKE run",
         "The function analysis was stored in %s",

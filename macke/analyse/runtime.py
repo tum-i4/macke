@@ -2,9 +2,10 @@
 Generate a json file with all runtime information inside a Macke run directory
 """
 
-from .helper import get_klee_registry_from_mackedir, generic_main
 from collections import OrderedDict
 from os import path
+
+from .helper import generic_main, get_klee_registry_from_mackedir
 
 
 def analyse_runtime(macke_directory):
@@ -22,7 +23,7 @@ def analyse_runtime(macke_directory):
 
     for _, klee in klees.items():
         # Load runtime information from run.stats
-        runtime = 0
+        runtime = 0.0
         with open(path.join(klee['folder'], 'run.stats')) as run_stats:
             # Read the entire file
             stats = run_stats.readlines()
@@ -54,6 +55,7 @@ def analyse_runtime(macke_directory):
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "Add a summary of all KLEE runtimes to the directory of a MACKE run",
         "The runtime analysis was stored in %s",

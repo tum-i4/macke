@@ -3,8 +3,8 @@ Load global configurations, if they exist in a config.ini file
 """
 
 import configparser
-from os import path
 import subprocess
+from os import path
 
 CONFIG = configparser.ConfigParser()
 CONFIGFILE = path.join(path.dirname(__file__), "..", "config.ini")

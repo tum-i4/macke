@@ -23,7 +23,7 @@ class TestMackePhaseTwo(unittest.TestCase):
         # Check, that all three errors were prepended and triggered again
         for vulninst in ["small.c:4", "small.c:9", "small.c:10"]:
             self.assertTrue(any(
-                err.vulnerableInstruction.endswith(vulninst) and
+                err.vulnerable_instruction.endswith(vulninst) and
                 err.errfile.endswith(".macke.err")
                 for err in m.errorregistry.forfunction["f1"]),
                 "Missing %s" % vulninst)

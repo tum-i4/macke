@@ -1,39 +1,45 @@
 """
 Details about the error chains found by a MACKE run
 """
-from .helper import get_error_registry_for_mackedir, generic_main
+from collections import OrderedDict
+from os import path
+from statistics import mean, stdev
+
 from ..CallGraph import CallGraph
 from ..ErrorChain import reconstruct_all_error_chains
-from collections import OrderedDict
-from statistics import mean, stdev
-from os import path
+from .helper import generic_main, get_error_registry_for_mackedir
 
 
 def chains(macke_directory):
-    registry = get_error_registry_for_mackedir(macke_directory)
-    cg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    """
+    Extract the information about the error chains as an OrderedDict
+    """
 
-    chains = reconstruct_all_error_chains(registry, cg)
+    registry = get_error_registry_for_mackedir(macke_directory)
+    clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+
+    errchains = reconstruct_all_error_chains(registry, clg)
     chainlengths = [len(chain)
-                    for _, chains in chains.items() for chain in chains]
+                    for _, chainlist in errchains.items()
+                    for chain in chainlist]
 
     # Calculate old 1-level-up statistic
     onelevelup = 0
-    for caller in cg.get_flattened_inverted_topology():
-        for callee in cg[caller]['calls']:
+    for caller in clg.get_flattened_inverted_topology():
+        for callee in clg[caller]['calls']:
             onelevelup += len(
-                registry.get_all_vulnerable_instructions_for_function(caller) &
-                registry.get_all_vulnerable_instructions_for_function(callee))
+                registry.get_all_vulninst_for_func(caller) &
+                registry.get_all_vulninst_for_func(callee))
 
     # Count the end phases
     endphaseone, endphasetwo = 0, 0
-    for vulninst, chainlist in chains.items():
+    for vulninst, chainlist in errchains.items():
         for chain in chainlist:
             # candidaterror are all errors, that end this chain
             # normally, this is just one error, but circles can have several
-            if any(candidaterror.vulnerableInstruction == vulninst and
-                    candidaterror.errfile.endswith(".macke.err")
-                    for candidaterror in registry.forfunction[chain[-1]]):
+            if any(candidaterror.vulnerable_instruction == vulninst and
+                   candidaterror.errfile.endswith(".macke.err")
+                   for candidaterror in registry.forfunction[chain[-1]]):
                 endphasetwo += 1
             else:
                 endphaseone += 1
@@ -50,12 +56,13 @@ def chains(macke_directory):
         ("1-level-up", onelevelup),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),
-        ("detail", chains),
+        ("detail", errchains),
     ])
     return result
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "Details about the error chains found by a MACKE run",
         "The details about the error chains were stored in %s",

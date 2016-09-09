@@ -3,7 +3,8 @@ Functions, that wraps all llvm actions and transformation into python functions
 """
 import json
 import subprocess
-from .config import LLVMOPT, LIBMACKEOPT
+
+from .config import LIBMACKEOPT, LLVMOPT
 
 
 def __run_subprocess(popenargs):
@@ -61,7 +62,7 @@ def prepend_error_from_dir(sourcefile, function, errordirlist, destfile=None):
     Wrapper around the prepend error pass
     """
     # Reject empty error lists
-    assert(errordirlist)
+    assert errordirlist
 
     # If no destfile is given, just modify the source file
     if destfile is None:

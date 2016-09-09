@@ -1,14 +1,18 @@
 """
 List all vulnerable instructions found by a MACKE run
 """
-from .helper import get_error_registry_for_mackedir, generic_main
-from ..CallGraph import CallGraph
+import operator
 from collections import OrderedDict
 from os import path
-import operator
+
+from ..CallGraph import CallGraph
+from .helper import generic_main, get_error_registry_for_mackedir
 
 
-def vulninst(macke_directory):
+def vulninsts(macke_directory):
+    """
+    Extract informations about the vulnerable instruction as an OrderedDict
+    """
     registry = get_error_registry_for_mackedir(macke_directory)
 
     vulninstdict = OrderedDict()
@@ -21,16 +25,15 @@ def vulninst(macke_directory):
             vulninstdict[vulninst].append(odict)
 
     # Get all library functions
-    cg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
-    libfuncs = cg.get_functions_without_any_caller()
+    clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    libfuncs = clg.get_functions_with_no_caller()
     libfuncs.discard("main")
 
     # Classify the vulnerable instructions by type
-    mainc = len(registry.get_all_vulnerable_instructions_for_function("main"))
+    mainc = len(registry.get_all_vulninst_for_func("main"))
     libvulninst = set()
     for libfunc in libfuncs:
-        libvulninst |= registry.get_all_vulnerable_instructions_for_function(
-            libfunc)
+        libvulninst |= registry.get_all_vulninst_for_func(libfunc)
     libc = len(libvulninst)
     innerc = registry.count_vulnerable_instructions() - libc
 
@@ -47,10 +50,11 @@ def vulninst(macke_directory):
 
 
 def main():
+    """ Entry point to run this analysis stand alone """
     generic_main(
         "List all vulnerable instructions found by a MACKE run",
         "The vulnerable instructions were stored in %s",
-        "vulninst.json", vulninst
+        "vulninst.json", vulninsts
     )
 
 if __name__ == '__main__':

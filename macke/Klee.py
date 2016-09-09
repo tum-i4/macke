@@ -2,12 +2,13 @@
 All interactions with KLEE
 """
 
-from collections import OrderedDict
-from os import listdir, path
 import json
 import operator
 import re
 import subprocess
+from collections import OrderedDict
+from os import listdir, path
+
 from .config import KLEEBIN
 from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
 
@@ -43,8 +44,9 @@ class KleeResult:
         self.chained = []
         for errfile in self.errfiles:
             if errfile.endswith(".macke.err"):
-                with open(errfile, 'r') as f:
-                    match = re.search(r"ERROR FROM (.+\.err)\n", f.readline())
+                with open(errfile, 'r') as file:
+                    match = re.search(
+                        r"ERROR FROM (.+\.err)\n", file.readline())
                 if match:
                     self.chained.append((errfile, match.group(1)))
 
@@ -153,8 +155,8 @@ def execute_klee(
         out = cperr.output.decode("utf-8", 'ignore')
 
     # Store all the output in a textfile inside the klee directory
-    with open(path.join(outdir, "output.txt"), 'w') as f:
-        f.write(out)
+    with open(path.join(outdir, "output.txt"), 'w') as file:
+        file.write(out)
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
