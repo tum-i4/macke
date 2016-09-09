@@ -1,11 +1,8 @@
 """
 Details about the error chains found by a MACKE run
 """
-from .helper import (
-    get_error_registry_for_mackedir, get_klee_registry_from_mackedir,
-    generic_main)
+from .helper import get_error_registry_for_mackedir, generic_main
 from ..CallGraph import CallGraph
-from ..Error import get_corresponding_kleedir_name
 from ..ErrorChain import reconstruct_all_error_chains
 from collections import OrderedDict
 from statistics import mean, stdev
@@ -13,8 +10,6 @@ from os import path
 
 
 def chains(macke_directory):
-    klees = get_klee_registry_from_mackedir(macke_directory)
-
     registry = get_error_registry_for_mackedir(macke_directory)
     cg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
 
@@ -34,16 +29,14 @@ def chains(macke_directory):
     endphaseone, endphasetwo = 0, 0
     for vulninst, chainlist in chains.items():
         for chain in chainlist:
-            for candidaterror in registry.forfunction[chain[-1]]:
-                if candidaterror.vulnerableInstruction == vulninst:
-                    # candidaterror is exactly the error ending this chain
-                    kleedir = get_corresponding_kleedir_name(
-                        candidaterror.errfile)
-
-                    if klees[kleedir]['phase'] == 1:
-                        endphaseone += 1
-                    elif candidaterror.errfile.endswith(".macke.err"):
-                        endphasetwo += 1
+            # candidaterror are all errors, that end this chain
+            # normally, this is just one error, but circles can have several
+            if any(candidaterror.vulnerableInstruction == vulninst and
+                    candidaterror.errfile.endswith(".macke.err")
+                    for candidaterror in registry.forfunction[chain[-1]]):
+                endphasetwo += 1
+            else:
+                endphaseone += 1
 
     result = OrderedDict([
         ("count", len(chainlengths)),
