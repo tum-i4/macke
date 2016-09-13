@@ -45,13 +45,16 @@ def linecoverage(macke_directory):
         for file, lines in position.items():
             if function not in perfunction:
                 perfunction[function] = dict()
+            istatsforfile = istats.get(file, dict())
             perfunction[function][file] = OrderedDict([
                 ('covered', sorted(list(
-                    set(lines) & istats[file]['covered']))),
+                    set(lines) & istatsforfile.get('covered', set())))),
                 ('uncovered', sorted(list(
-                    set(lines) & istats[file]['uncovered']))),
-                ('removed', sorted(list(set(lines) - istats[file]['covered'] -
-                                        istats[file]['uncovered'])))
+                    set(lines) & istatsforfile.get('uncovered', set())))),
+                ('removed', sorted(list((set(lines) -
+                                         istatsforfile.get('covered', set())) -
+                                        istatsforfile.get('uncovered', set()))
+                                  ))
             ])
 
     # Count the absolute numbers
