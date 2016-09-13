@@ -5,7 +5,10 @@ All interactions with KLEE
 import json
 import operator
 import re
+import shutil
 import subprocess
+import tempfile
+
 from collections import OrderedDict
 from os import listdir, path
 
@@ -146,13 +149,20 @@ def execute_klee(
     command = ([KLEEBIN, "--output-dir=" + outdir] + flags +
                [bcfile] + posixflags)
 
+    # Create a new, empty directory
+    tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
+
     # actually run KLEE
     try:
         out = subprocess.check_output(
-            command, stderr=subprocess.STDOUT).decode("utf-8", 'ignore')
+            command, stderr=subprocess.STDOUT,
+            cwd=tmpdir).decode("utf-8", 'ignore')
     except subprocess.CalledProcessError as cperr:
         # If something went wrong, we still read the output for analysis
         out = cperr.output.decode("utf-8", 'ignore')
+
+    # Remove the temporary directory
+    shutil.rmtree(tmpdir)
 
     # Store all the output in a textfile inside the klee directory
     with open(path.join(outdir, "output.txt"), 'w') as file:
