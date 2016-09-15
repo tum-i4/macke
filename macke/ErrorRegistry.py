@@ -33,25 +33,33 @@ class ErrorRegistry:
 
     def create_entry(self, errfile, entryfunction):
         """ Create a new error and add it to the registry """
-        self.register_error(Error(errfile, entryfunction))
+        err = Error(errfile, entryfunction)
+
+        if not err.is_blacklisted():
+            self.register_error(err)
 
     def register_error(self, error):
         """ register an existing error """
-        add_to_listdict(self.forfunction, error.entryfunction, error)
-        self.forerrfile[error.errfile] = error
-        self.errorcounter += 1
 
         if error.errfile.endswith(".macke.err"):
-            self.mackerrorcounter += 1
-
-            # Find the previous error
+            # Find the prepended error
             # "ERROR FROM /path/test0000001.ptr.err"
             testfrom = error.reason[len("ERROR FROM "):].strip()
-            preverr = self.forerrfile[testfrom]
+
+            # Exclude all MACKE errors based on black listed errors
+            if testfrom not in self.forerrfile:
+                return
+
+            self.mackerrorcounter += 1
             add_to_listdict(self.mackeforerrfile, testfrom, error)
 
             # Propagate information about the vulnerable instruction
+            preverr = self.forerrfile[testfrom]
             error.vulnerable_instruction = str(preverr.vulnerable_instruction)
+
+        add_to_listdict(self.forfunction, error.entryfunction, error)
+        self.forerrfile[error.errfile] = error
+        self.errorcounter += 1
 
         add_to_listdict(self.forvulninst, error.vulnerable_instruction, error)
 

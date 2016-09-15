@@ -49,6 +49,14 @@ class Error:
             self.entryfunction, self.errfile, self.reason,
             self.vulnerable_instruction)
 
+    def is_blacklisted(self):
+        """
+        Exclude some error reasons, that are not helpful for further analysis
+        """
+        # klee_get_obj_size can be removed, if KLEE fixes bug #458
+        # See: https://github.com/klee/klee/issues/458
+        return "klee_get_obj_size" in self.reason
+
     def as_ordered_dict(self):
         """ Get all informations about this error in an ordered dict """
         return OrderedDict([
