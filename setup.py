@@ -18,6 +18,7 @@ setup(
         'console_scripts': [
             'macke = macke.__main__:main',
             'macke-analyze = macke.analyse.everything:main',
+            'shamrock = shamrock.__main__:main',
         ]
     },
     classifiers=[
