@@ -24,7 +24,13 @@ def analyse_runtime(macke_directory):
     for _, klee in klees.items():
         # Load runtime information from run.stats
         runtime = 0.0
-        with open(path.join(klee['folder'], 'run.stats')) as run_stats:
+
+        run_stats_file = path.join(klee['folder'], 'run.stats')
+        # Skip non existing files
+        if not path.isfile(run_stats_file):
+            continue
+
+        with open(run_stats_file) as run_stats:
             # Read the entire file
             stats = run_stats.readlines()
 

@@ -2,12 +2,18 @@
 All logic to read informations from KLEE's run.istats file
 """
 
+from os import path
+
 
 def extract_linecoverage(run_istats_file):
     """
     Extract all lines of code, that were mentioned in a run.istats file
     Result: dict(file: {covered: [lines], uncovered: [lines]})
     """
+
+    # no run.istats file means empty result
+    if not path.isfile(run_istats_file):
+        return dict()
 
     content = []
     with open(run_istats_file, 'r') as file:
