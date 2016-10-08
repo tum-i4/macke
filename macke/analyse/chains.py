@@ -47,9 +47,9 @@ def chains(macke_directory):
     result = OrderedDict([
         ("count", len(chainlengths)),
         ("length", OrderedDict([
-            ("min", min(chainlengths)),
-            ("max", max(chainlengths)),
-            ("avg", mean(chainlengths)),
+            ("min", min(chainlengths) if chainlengths else -1),
+            ("max", max(chainlengths) if chainlengths else -1),
+            ("avg", mean(chainlengths) if chainlengths else -1),
             ("std", stdev(chainlengths) if len(chainlengths) > 2 else -1),
         ])),
         ("longerthanone", len([True for c in chainlengths if c > 1])),
