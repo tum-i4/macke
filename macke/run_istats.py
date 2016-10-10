@@ -63,6 +63,9 @@ def extract_linecoverage(run_istats_file):
         elif line.startswith("calls="):
             # Line with informations about a call instruction
             pass
+        elif not line.strip():
+            # Ingore empty lines
+            pass
         else:
             raise ValueError("Invalid line %s" % line)
 
