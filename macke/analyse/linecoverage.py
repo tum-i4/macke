@@ -25,8 +25,13 @@ def linecoverage(macke_directory):
     # Collect all covered and uncovered lines from all run.istats
     istats = dict()
     for _, klee in klees.items():
-        for file, info in extract_linecoverage(
-                path.join(klee['folder'], "run.istats")).items():
+
+        istatsfile = path.join(klee['folder'], "run.istats")
+        if not path.isfile(istatsfile):
+            istatsfile = path.join(macke_directory, 'klee',
+                                   path.basename(klee['folder']), "run.istats")
+
+        for file, info in extract_linecoverage(istatsfile).items():
             if file in istats:
                 # Merge existing information with the new information
                 istats[file]['covered'] |= info['covered']
@@ -86,6 +91,7 @@ def main():
         "The coverage analysis was stored in %s",
         "coverage.json", linecoverage
     )
+
 
 if __name__ == '__main__':
     main()
