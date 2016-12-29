@@ -1,0 +1,7 @@
+Error: ASSERTION FAIL: i != 42
+File: /some/path/file.c
+Line: 21
+assembly.ll line: 84
+Stack: 
+    #000000001 in func (i) at /some/path/file.c:5
+    #100000001 in __user_main (=1, =0)
