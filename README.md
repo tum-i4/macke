@@ -13,11 +13,11 @@ Building KLEE can be a complicated task and there are multiple strategies for it
 
 For our step-by-step manual, this means, that you have to adapt one command. Instead of:
 ```
-git clone --depth 1 --branch v1.2.0 https://github.com/klee/klee.git
+git clone --depth 1 --branch v1.3.0 https://github.com/klee/klee.git
 ```
 in [Step 6](https://github.com/hutoTUM/install-klee#step-6-klee), you must use:
 ```
-git clone --depth 1 --branch targeted_search https://github.com/hutoTUM/klee.git
+git clone --depth 1 --branch targeted-search https://github.com/tum-i22/klee22.git
 ```
 
 ### Step 2: Building the macke-llvm-opt passes
@@ -37,7 +37,7 @@ make integrationtest LLVM_SRC_PATH=~/build/llvm/ KLEE_BUILDDIR=~/build/klee/Rele
 ### Step 3: Building MACKE
 We are done with the dependencies - now to the main project.
 ```
-git clone --depth 1 https://github.com/hutoTUM/macke.git
+git clone --depth 1 https://github.com/tum-i22/macke
 cd macke
 make dev
 ```
