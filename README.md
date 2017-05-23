@@ -26,7 +26,7 @@ MACKE performs several modifications on LLVM bitcode level. Doing this inside py
 If you choose a different directory structure than suggested in our Step-by-Step manual, please adapt the pathes to match your needs.
 
 ```
-git clone --depth 1 https://github.com/hutoTUM/macke-opt-llvm.git
+git clone --depth 1 https://github.com/tum-i22/macke-opt-llvm 
 cd macke-opt-llvm
 make LLVM_SRC_PATH=~/build/llvm/ KLEE_BUILDDIR=~/build/klee/Release+Asserts KLEE_INCLUDES=~/build/klee/include/
 
