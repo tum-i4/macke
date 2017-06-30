@@ -9,7 +9,7 @@ MACKE is a wrapper around [KLEE](https://klee.github.io/), that decomposes the a
 * A system able to run LLVM. See [official requirements for LLVM](http://www.llvm.org/docs/GettingStarted.html#requirements)
 
 ### Step 1: LLVM and KLEE with targeted search
-Building KLEE can be a complicated task and there are multiple strategies for it. We suggest the setup described in our [Step-by-Step manual](https://github.com/hutoTUM/install-klee). But whatever way you choose, MACKE needs a special search mode, that is not part of the official KLEE code, yet. We aim to merge it into KLEE someday, but till then, you need to use [our fork of KLEE](https://github.com/hutoTUM/klee/) and checkout its targeted_search branch.
+Building KLEE can be a complicated task and there are multiple strategies for it. We suggest the setup described in our [Step-by-Step manual](https://github.com/hutoTUM/install-klee). But whatever way you choose, MACKE needs a special search mode, that is not part of the official KLEE code, yet. We aim to merge it into KLEE someday, but till then, you need to use [our fork of KLEE](https://github.com/tum-i22/klee22) and checkout its targeted-search branch.
 
 For our step-by-step manual, this means, that you have to adapt one command. Instead of:
 ```
