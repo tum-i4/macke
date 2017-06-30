@@ -54,6 +54,6 @@ We wish you happy testing! If you have problems converting existing source code 
 
 ## Author's note
 
-[Email me](mailto:ognawala@in.tum.de) if something is broken. Ditto if you would like to contribute!
+Email [HuTo](mailto:t.hutzelmann@tum.de) or [me](mailto:ognawala@in.tum.de) if something is broken. Ditto if you would like to contribute!
 
 > [Saahil Ognawala](https://www.i22.in.tum.de/index.php?id=31&L=1)
