@@ -17,7 +17,7 @@ git clone --depth 1 --branch v1.3.0 https://github.com/klee/klee.git
 ```
 in [Step 6](https://github.com/hutoTUM/install-klee#step-6-klee), you must use:
 ```
-git clone --depth 1 --branch targeted-search https://github.com/tum-i22/klee22.git
+git clone --depth 1 --branch sonar https://github.com/tum-i22/klee22.git
 ```
 
 ### Step 2: Building the macke-llvm-opt passes
