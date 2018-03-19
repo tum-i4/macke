@@ -176,11 +176,11 @@ def execute_klee_targeted_search(
         bcfile, analyzedfunc, targetfunc, outdir,
         flags=None, posixflags=None, posix4main=None):
     """
-    Execute KLEE on a bitcode file with targeted search for targetfunc
+    Execute KLEE on a bitcode file with sonar search for targetfunc call
     """
 
     # use empty list as default flags
     flags = [] if flags is None else flags
-    flags = ["--search=ld2t", "--targeted-function=" + targetfunc] + flags
+    flags = ["--search=sonar", "--sonar-target=function-call", "--sonar-target-info=" + targetfunc] + flags
     return execute_klee(
         bcfile, analyzedfunc, outdir, flags, posixflags, posix4main)
