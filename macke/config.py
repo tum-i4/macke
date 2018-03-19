@@ -61,8 +61,8 @@ def check_config():
     if b"KLEE" not in kvers or b"LLVM version 3.4.2" not in kvers:
         raise Exception("Config: Invalid klee version")
     khelp = __get_output_from([KLEEBIN, "-help"])
-    if any(t not in khelp for t in [b"=ld2t", b"-targeted-function=<string>"]):
-        raise Exception("Config: klee does not support targeted search")
+    if any(t not in khelp for t in [b"=sonar", b"-sonar-target", b"-sonar-target-info=<string>"]):
+        raise Exception("Config: klee does not support sonar search")
 
     # Check, if a reasonable number of threads is used
     if THREADNUM is not None and not 0 < THREADNUM < 128:
