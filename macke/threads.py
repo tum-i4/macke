@@ -4,6 +4,16 @@ All functions, that are executed in parallel threads
 
 from .Klee import execute_klee, execute_klee_targeted_search
 
+from .Fuzzer import FuzzManager
+
+
+# We parse the fuzztime in flags
+def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, flags):
+    fuzztime = 60
+    print("starting thread")
+    resultlist.append(fuzzmanager.execute_afl_fuzz(functionname, outdir, fuzztime))
+    print("ended thread")
+
 
 def thread_phase_one(
         resultlist, functionname, symmains_bc, outdir,

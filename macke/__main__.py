@@ -67,6 +67,13 @@ def main():
         help="Symbolic file argument passed to main function"
     )
 
+    parser.add_argument(
+        '--use-fuzzer',
+        type=bool,
+        default=False,
+        help="Toggle to use experimental fuzzing feature"
+    )
+
     check_config()
 
     args = parser.parse_args()
@@ -90,7 +97,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, posixflags, posix4main)
+                  False, flags_user, posixflags, posix4main, use_fuzzer=args.use_fuzzer)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":
