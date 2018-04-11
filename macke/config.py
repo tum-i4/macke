@@ -10,9 +10,25 @@ CONFIG = configparser.ConfigParser()
 CONFIGFILE = path.join(path.dirname(__file__), "..", "config.ini")
 CONFIG.read(CONFIGFILE)
 
+
+# for fuzzer
+LIBMACKEFUZZPATH = path.expanduser(CONFIG.get("binaries", "libmackefuzzopt"))
+LIBMACKEFUZZOPT = path.join(LIBMACKEFUZZPATH, "bin", "libMackeFuzzerOpt.so")
+AFLLIB = path.expanduser(CONFIG.get("binaries", "afl-lib"))
+AFLBIN = path.expanduser(CONFIG.get("binaries", "afl-bin"))
+AFLCC = path.join(AFLBIN, "afl-clang-fast")
+AFLFUZZ = path.join(AFLBIN, "afl-fuzz")
+LLVMCONFIG = path.expanduser(CONFIG.get("binaries", "llvm-config"))
+LLVMBINDIR = subprocess.check_output([LLVMCONFIG, "--bindir"]).decode("utf-8").strip()
+CLANG = path.join(LLVMBINDIR, "clang")
+LLVMFUZZOPT = path.join(LLVMBINDIR, "opt")
+
+# for symbolic execution
 LIBMACKEOPT = path.expanduser(CONFIG.get("binaries", "libmackeopt"))
 LLVMOPT = path.expanduser(CONFIG.get("binaries", "llvmopt", fallback="opt"))
 KLEEBIN = path.expanduser(CONFIG.get("binaries", "klee", fallback="klee"))
+
+# general
 THREADNUM = CONFIG.getint("runtime", "threadnum", fallback=None)
 
 
