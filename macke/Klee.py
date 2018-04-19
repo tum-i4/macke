@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 from collections import OrderedDict
-from os import listdir, path
+from os import listdir, path, makedirs
 
 from .config import KLEEBIN
 from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
@@ -159,6 +159,8 @@ def execute_klee(
             cwd=tmpdir).decode("utf-8", 'ignore')
     except subprocess.CalledProcessError as cperr:
         # If something went wrong, we still read the output for analysis
+        # We might have to create the outdir though, if klee failed and didn't create it
+        makedirs(outdir)
         out = cperr.output.decode("utf-8", 'ignore')
 
     # Remove the temporary directory
