@@ -42,7 +42,8 @@ class Macke:
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
-                 exclude_known_from_phase_two=True, use_fuzzer = False):
+                 exclude_known_from_phase_two=True, use_fuzzer=False,
+                 fuzztime=1):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -93,6 +94,7 @@ class Macke:
         # Setting the fuzzdir
         self.use_fuzzer = use_fuzzer
         if use_fuzzer:
+            self.fuzztime = fuzztime
             self.fuzzdir = path.join(self.rundir, "fuzzer")
 
     def get_next_klee_directory(self, info):
@@ -182,29 +184,31 @@ class Macke:
         # Generate a call graph
         self.callgraph = CallGraph(self.bitcodefile)
 
+
         if self.use_fuzzer:
             tasks = self.fuzz_manager.list_suitable_drivers()
             self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
                          % (len(tasks), len(self.callgraph.graph)))
             self.qprint("Phase 1: Performing afl-fuzz runs ...")
-        else:
-            # Fill a list of functions for the symbolic encapsulation
-            tasks = self.callgraph.list_symbolic_encapsulable(
-                removemain=not bool(self.posix4main))
 
-            self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
-                        "encapsulation" % (len(tasks), len(self.callgraph.graph)))
+        # Fill a list of functions for the symbolic encapsulation
+        tasks = self.callgraph.list_symbolic_encapsulable(
+            removemain=not bool(self.posix4main))
 
-            self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
-            # Copy the program bc before encapsulating everything symbolically
-            shutil.copy2(self.program_bc, self.symmains_bc)
+        self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
+                    "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
-            # Generate one bcfile with symbolic encapsulations for each function
-            for functionname in tasks:
-                if functionname != "main":
-                    encapsulate_symbolic(self.symmains_bc, functionname)
-            self.qprint(" done")
-            self.qprint("Phase 1: Performing KLEE runs ...")
+        self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
+
+        # Copy the program bc before encapsulating everything symbolically
+        shutil.copy2(self.program_bc, self.symmains_bc)
+
+        # Generate one bcfile with symbolic encapsulations for each function
+        for functionname in tasks:
+            if functionname != "main":
+                encapsulate_symbolic(self.symmains_bc, functionname)
+        self.qprint(" done")
+        self.qprint("Phase 1: Performing KLEE runs ...")
 
         pbar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
@@ -362,8 +366,7 @@ class Macke:
         if phase == 1:
             for function in run:
                 if self.use_fuzzer:
-                    print("calling apply async for: " + function)
-                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, resultlist, function, path.join(self.fuzzdir, "fuzz_out_" + function), self.flags_user))
+                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, resultlist, function, path.join(self.fuzzdir, "fuzz_out_" + function), self.fuzztime))
                 else:
                     pool.apply_async(thread_phase_one, (
                         resultlist, function, self.symmains_bc,

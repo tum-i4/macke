@@ -74,6 +74,15 @@ def main():
         help="Toggle to use experimental fuzzing feature"
     )
 
+    parser.add_argument(
+        '--fuzz-time',
+        type=int,
+        default=10,
+        help="Time to fuzz a single function (in minutes)"
+    )
+
+
+
     check_config()
 
     args = parser.parse_args()
@@ -97,7 +106,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, posixflags, posix4main, use_fuzzer=args.use_fuzzer)
+                  False, flags_user, posixflags, posix4main, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

@@ -7,12 +7,20 @@ from .Klee import execute_klee, execute_klee_targeted_search
 from .Fuzzer import FuzzManager
 
 
+import subprocess
+
 # We parse the fuzztime in flags
-def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, flags):
-    fuzztime = 60
-    print("starting thread")
-    resultlist.append(fuzzmanager.execute_afl_fuzz(functionname, outdir, fuzztime))
-    print("ended thread")
+def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, fuzztime):
+    try:
+        # minutes to seconds
+        fuzztime *= 60
+        resultlist.append(fuzzmanager.execute_afl_fuzz(functionname, outdir, fuzztime))
+    except Exception as exc:
+        print()
+        print("A fuzz thread in phase one throws an exception")
+        print("The analyzed function was:", functionname)
+        print(exc)
+        print()
 
 
 def thread_phase_one(

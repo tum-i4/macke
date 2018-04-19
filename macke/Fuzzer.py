@@ -11,44 +11,89 @@ from os import environ, path, makedirs, listdir, kill
 
 from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ
 
+from .Asan import AsanResult
+from .Error import Error
+
 
 def _dir_contains_no_files(dirname):
     return not any(path.isfile(f) for f in listdir(dirname))
+
+def _run_checked_silent_subprocess(popenargs):
+    subprocess.check_output(popenargs, stderr=subprocess.STDOUT)
+
+def _run_subprocess(*args, **kwargs):
+    """
+    Starts a subprocess, waits for it and returns (exitcode, output, erroutput)
+    """
+    p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = ""
+    err = ""
+    while p.poll() is None:
+        (o, e) = p.communicate(None)
+        output += o.decode("utf-8")
+        err += e.decode("utf-8")
+
+    return p.returncode, output, err
 
 
 class FuzzResult:
     """
     Container, that stores all information about a afl fuzzing run
     """
-    def __init__(self, reproducer, functionname, errordir, outdir):
-        self.functionname = functionname
-        self.outdir = outdir
-        self.errordir = errordir
+    def __init__(self, fuzzmanager, functionname, errordir, outdir):
+        self.fuzzmanager = fuzzmanager
+
+        # duck typing - behave similar to kleeresult
+        self.analyzedfunc = functionname
+        self.outdir = errordir
+        self.fuzzoutdir = outdir
 
         inputcorpus = path.join(outdir, "queue")
-        find_errors(reproducer, inputcorpus)
+        self.find_errors(fuzzmanager.reproducer, inputcorpus)
 
 
     def find_errors(self, reproducer, inputcorpus):
-        print("calling reproducer on found paths for function" + functionname)
+        """
+        Calls reproducer on all inputs and calculates statistics
+        """
+        #print("calling reproducer on found paths for function " + self.analyzedfunc)
         self.errorlist = []
+        asanerrorlist = []
+
+        # again duck typing names
+        self.errfiles = []
+        self.testcount = 0
+        self.errorcount = 0
+
         for f in listdir(inputcorpus):
-            if not path.isfile(inputcorpus):
+            fname = path.join(inputcorpus, f)
+            if not path.isfile(fname):
                 continue
-            infd = open(f, "r")
-            reproduced = AsanResult(subprocess.check_output([
-                reproducer, "--fuzz-driver=" + self.functionname], stdin=infd))
+            self.testcount += 1
+            infd = open(fname, "r")
+            (returncode, stdoutdata, stderrdata) = _run_subprocess(
+                [reproducer, "--fuzz-driver=" + self.analyzedfunc], stdin=infd)
+            reproduced = AsanResult(stderrdata, fname, self.analyzedfunc)
             infd.close()
             if reproduced.iserror:
-                errorlist.append(reproduced)
+                error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
+                self.errorcount += 1
+                self.errfiles.append(fname)
+                asanerrorlist.append(error)
+
+        # Convert AsanErrors to ktests (and ktest.errs)
+        for i in range(0, len(asanerrorlist)):
+            errname = "fuzzer%0.5d" % i
+            errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
+            self.errorlist.append(Error(errfile, self.analyzedfunc))
 
 
     def get_outname(self):
         """ Get the directory name of the fuzzer output directory """
-        return path.basename(self.outdir)
+        return path.basename(self.fuzzoutdir)
 
     def get_errors(self):
-        return None
+        return self.errorlist
 
 
 
@@ -60,19 +105,18 @@ class FuzzManager:
         """
         Compile necessary binaries and save the names to them
         """
-
         self.cflags = [] if cflags is None else cflags
         self.fuzzdir = fuzzdir
         self.inputdir = path.join(fuzzdir, "inputdir")
         self.builddir = builddir
+        self.orig_bcfile = bcfile
         makedirs(self.inputdir)
-
-        print("made inputdir " + self.inputdir)
 
         ## Set necessary environment
         environ["AFL_PATH"] = AFLLIB
         environ["AFL_CC"] = CLANG
         environ["AFL_NO_UI"] = "1"
+        environ["AFL_QUIET"] = "1"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")
@@ -86,31 +130,30 @@ class FuzzManager:
 
         ## Compile helper functions
         # For afl
-        subprocess.check_call([AFLCC, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
-        subprocess.check_call([AFLCC, "-c", "-g"] + self.cflags + [initializer_source_path, "-o", initializer_afl_instrumented])
+        _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
+        _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [initializer_source_path, "-o", initializer_afl_instrumented])
         # For reproducer
-        subprocess.check_call([CLANG, "-c", "-g", "-fsanitize=address"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_reproducer])
-        subprocess.check_call([CLANG, "-c", "-g", "-fsanitize=address", "-D__REPRODUCE_FUZZING"] + self.cflags + [initializer_source_path, "-o", initializer_reproducer])
+        _run_checked_silent_subprocess([CLANG, "-c", "-g", "-fsanitize=address"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_reproducer])
+        _run_checked_silent_subprocess([CLANG, "-c", "-g", "-fsanitize=address", "-D__REPRODUCE_FUZZING"] + self.cflags + [initializer_source_path, "-o", initializer_reproducer])
 
         ## Instrument the bcfile
         # Add drivers
-        subprocess.check_call([
+        _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-insert-fuzzdriver",
             "-renamemain", "-mem2reg", bcfile, "-o", target_with_drivers])
         # Add with asan for reproducer
-        subprocess.check_call([
+        _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-enable-asan",
             "-asan", "-asan-module", target_with_drivers, "-o", target_with_drivers_and_asan])
 
 
         # Compile general driver
         self.afltarget = path.join(builddir, "afl-target")
-        subprocess.check_call([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
+        _run_checked_silent_subprocess([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
         # Compile reproducer
         self.reproducer = path.join(builddir, "reproducer")
-        subprocess.check_call([AFLCC, "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
-
+        _run_checked_silent_subprocess([AFLCC, "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
 
 
 
@@ -133,10 +176,31 @@ class FuzzManager:
         proc = subprocess.Popen([AFLFUZZ, "-i", self.inputdir, "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
 
         time.sleep(fuzztime)
-        kill(proc.pid, signal.SIGKILL)
+        kill(proc.pid, signal.SIGTERM)
         outfd.close()
 
-        print("now getting fuzzresults...")
+        errordir = path.join(outdir, "macke_errors")
+        makedirs(errordir)
 
-        return FuzzResult(reproducer, functionname, errordir, outdir);
+        return FuzzResult(self, functionname, errordir, outdir);
 
+    def minimize_crash(self, crashinputfile, asanerror, function):
+        # Stub at the moment
+        return asanerror
+
+
+    def run_ktest_converter(self, function, inputfile, outfile, kleeargs):
+        """
+        Creates a ktest from an inputfile
+        """
+        if not kleeargs:
+            kleeargs.append("<fuzzed function '" + function + "'>")
+        kleeargflags = []
+        for kleearg in kleeargs:
+            kleeargflags.append("-kleeargs")
+            kleeargflags.append(kleearg)
+
+
+        _run_checked_silent_subprocess([
+            LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
+            "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile]);
