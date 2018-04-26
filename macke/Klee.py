@@ -160,7 +160,8 @@ def execute_klee(
     except subprocess.CalledProcessError as cperr:
         # If something went wrong, we still read the output for analysis
         # We might have to create the outdir though, if klee failed and didn't create it
-        makedirs(outdir)
+        if not path.exists(outdir):
+            makedirs(outdir)
         out = cperr.output.decode("utf-8", 'ignore')
 
     # Remove the temporary directory
