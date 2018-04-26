@@ -26,12 +26,12 @@ def _run_subprocess(*args, **kwargs):
     Starts a subprocess, waits for it and returns (exitcode, output, erroutput)
     """
     p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = ""
-    err = ""
+    output = b""
+    err = b""
     while p.poll() is None:
         (o, e) = p.communicate(None)
-        output += o.decode("utf-8")
-        err += e.decode("utf-8")
+        output += o
+        err += e
 
     return p.returncode, output, err
 
@@ -65,27 +65,30 @@ class FuzzResult:
         self.testcount = 0
         self.errorcount = 0
 
-        for f in listdir(inputcorpus):
-            fname = path.join(inputcorpus, f)
-            if not path.isfile(fname):
-                continue
-            self.testcount += 1
-            infd = open(fname, "r")
-            (returncode, stdoutdata, stderrdata) = _run_subprocess(
-                [reproducer, "--fuzz-driver=" + self.analyzedfunc], stdin=infd)
-            reproduced = AsanResult(stderrdata, fname, self.analyzedfunc)
-            infd.close()
-            if reproduced.iserror:
-                error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
-                self.errorcount += 1
-                self.errfiles.append(fname)
-                asanerrorlist.append(error)
+        if path.exists(inputcorpus):
+            for f in listdir(inputcorpus):
+                fname = path.join(inputcorpus, f)
+                if not path.isfile(fname):
+                    continue
+                self.testcount += 1
+                infd = open(fname, "r")
+                (returncode, stdoutdata, stderrdata) = _run_subprocess(
+                    [reproducer, "--fuzz-driver=" + self.analyzedfunc], stdin=infd)
+                reproduced = AsanResult(stderrdata, fname, self.analyzedfunc)
+                infd.close()
+                if reproduced.iserror:
+                    error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
+                    self.errorcount += 1
+                    self.errfiles.append(fname)
+                    asanerrorlist.append(error)
 
-        # Convert AsanErrors to ktests (and ktest.errs)
-        for i in range(0, len(asanerrorlist)):
-            errname = "fuzzer%0.5d" % i
-            errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
-            self.errorlist.append(Error(errfile, self.analyzedfunc))
+            # Convert AsanErrors to ktests (and ktest.errs)
+            for i in range(0, len(asanerrorlist)):
+                errname = "fuzzer%0.5d" % i
+                errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
+                self.errorlist.append(Error(errfile, self.analyzedfunc))
+        else:
+            print("Couldn't fuzz: " + self.analyzedfunc)
 
 
     def get_outname(self):
@@ -117,6 +120,7 @@ class FuzzManager:
         environ["AFL_CC"] = CLANG
         environ["AFL_NO_UI"] = "1"
         environ["AFL_QUIET"] = "1"
+        environ["AFL_SKIP_CRASHES"] = "1"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")

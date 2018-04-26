@@ -10,7 +10,7 @@ class AsanResult:
         self.analyzedfunc = analyzedfunc
         self.inputfile = inputfile
         self.output = program_output
-        self.iserror = "==ERROR:" in self.output
+        self.iserror = b"==ERROR:" in self.output
 
         if self.iserror:
             self.parse_asan_output()
@@ -26,11 +26,12 @@ class AsanResult:
             if len(splits) > 1:
                 return splits[0], splits[1]
             return splits[0], "0"
+        return "<Unknown>", "0"
 
     def has_stack_trace(self):
         """ Return true if stack trace data is found """
         # Check for "#0" and "#1"
-        return "#0" in self.output and "#1" in self.output
+        return b"#0" in self.output and b"#1" in self.output
 
     def parse_asan_output(self):
         assert self.iserror
@@ -38,10 +39,10 @@ class AsanResult:
         lines = self.output.splitlines()
         for line in lines:
             # Get the first word after the "Sanitizer:" string on the line that contains "==ERROR:"
-            if "==ERROR:" in line:
-                description = line[line.find("Sanitizer:")+11:]
+            if b"==ERROR:" in line:
+                description = line[line.find(b"Sanitizer:")+11:]
                 description.strip()
-                self.description = description.split(' ')[0]
+                self.description = description.split(b' ')[0].decode("utf-8")
 
         self.stack = []
         if self.has_stack_trace():
@@ -49,17 +50,17 @@ class AsanResult:
             lno = 0
             fno = 0
 
-            while "#0" not in lines[lno]:
+            while b"#0" not in lines[lno]:
                 lno += 1
 
-            while lno < len(lines) and "#%d" % fno in lines[lno]:
-                words = lines[lno].strip().split(' ')
+            while lno < len(lines) and b"#%d" % fno in lines[lno]:
+                words = lines[lno].strip().split(b' ')
 
                 # function name is 4th word
-                fname = words[3]
+                fname = words[3].decode("utf-8")
 
                 # location is 5th word
-                location = words[4]
+                location = words[4].decode("utf-8")
                 self.stack.append((fname, location))
                 lno += 1
                 fno += 1
