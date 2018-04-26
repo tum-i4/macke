@@ -176,15 +176,27 @@ class FuzzManager:
         return subprocess.check_output([self.reproducer, "--fuzz-driver=" + functionname])
 
     def execute_afl_fuzz(self, functionname, outdir, fuzztime):
-        outfd = open("/dev/null", "w")
+        errordir = path.join(outdir, "macke_errors")
+        # This creates outdir + error dir
+        makedirs(errordir)
+
+        outfd = open(path.join(outdir, "output.txt"), "w")
         proc = subprocess.Popen([AFLFUZZ, "-i", self.inputdir, "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
 
         time.sleep(fuzztime)
-        kill(proc.pid, signal.SIGTERM)
+        kill(proc.pid, signal.SIGINT)
+        # wait for afl-fuzz to cleanup
+        proc.wait();
         outfd.close()
 
-        errordir = path.join(outdir, "macke_errors")
-        makedirs(errordir)
+        # afl-fuzz sometimes does not cleanup the target correctly, do it here
+        try:
+            pidstr = subprocess.check_output(["pgrep", "-x", "-f", self.afltarget + " --fuzz-driver=" + functionname]).decode("ascii")
+            pids = pidstr.split('\n')
+            kill(int(pids[0]), signal.SIGKILL)
+        except subprocess.CalledProcessError as ex:
+            pass
+
 
         return FuzzResult(self, functionname, errordir, outdir);
 
