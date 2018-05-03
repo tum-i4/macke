@@ -56,6 +56,7 @@ class ErrorRegistry:
             # Propagate information about the vulnerable instruction
             preverr = self.forerrfile[testfrom]
             error.vulnerable_instruction = str(preverr.vulnerable_instruction)
+            error.stacktrace.prepend(preverr.stacktrace)
 
         add_to_listdict(self.forfunction, error.entryfunction, error)
         self.forerrfile[error.errfile] = error
@@ -97,20 +98,15 @@ class ErrorRegistry:
         if callee not in self.forfunction:
             return set()
 
-        vi_caller = self.get_all_vulninst_for_func(caller)
-        vi_callee = self.get_all_vulninst_for_func(callee)
-
-        vitoprepend = vi_callee
-        if exclude_known:
-            vitoprepend -= vi_caller
-
-        if not vitoprepend:
-            return set()
+        err_caller = self.forfunction[caller]
+        err_callee = self.forfunction[callee]
 
         result = set()
-        for err in self.forfunction[callee]:
-            if err.vulnerable_instruction in vitoprepend:
-                result.add(err.errfile)
+        for err in err_callee:
+            # Look whether it is already known
+            if exclude_known and any(err.stacktrace.is_contained_in(err2.stacktrace) for err2 in err_caller):
+                continue
+            result.add(err.errfile)
 
         return result
 

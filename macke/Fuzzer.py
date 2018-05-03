@@ -9,7 +9,7 @@ import signal
 
 from os import environ, path, makedirs, listdir, kill
 
-from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ
+from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
 
 from .Asan import AsanResult
 from .Error import Error
@@ -49,10 +49,12 @@ class FuzzResult:
         self.fuzzoutdir = outdir
 
         inputcorpus = path.join(outdir, "queue")
-        self.find_errors(fuzzmanager.reproducer, inputcorpus)
+        crashcorpus = path.join(outdir, "crashes")
+
+        self.find_errors(inputcorpus, crashcorpus)
 
 
-    def find_errors(self, reproducer, inputcorpus):
+    def find_errors(self, inputcorpus, crashcorpus):
         """
         Calls reproducer on all inputs and calculates statistics
         """
@@ -65,29 +67,30 @@ class FuzzResult:
         self.testcount = 0
         self.errorcount = 0
 
-        if path.exists(inputcorpus):
-            for f in listdir(inputcorpus):
-                fname = path.join(inputcorpus, f)
+        inputdirectories = [inputcorpus, crashcorpus]
+
+        for d in inputdirectories:
+            for f in listdir(d):
+                if not f.startswith("id:"):
+                    continue
+                fname = path.join(d, f)
                 if not path.isfile(fname):
                     continue
                 self.testcount += 1
-                infd = open(fname, "r")
-                (returncode, stdoutdata, stderrdata) = _run_subprocess(
-                    [reproducer, "--fuzz-driver=" + self.analyzedfunc], stdin=infd)
-                reproduced = AsanResult(stderrdata, fname, self.analyzedfunc)
-                infd.close()
+                reproduced = self.fuzzmanager.execute_reproducer(fname, self.analyzedfunc)
                 if reproduced.iserror:
                     error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
                     self.errorcount += 1
                     self.errfiles.append(fname)
                     asanerrorlist.append(error)
 
-            # Convert AsanErrors to ktests (and ktest.errs)
-            for i in range(0, len(asanerrorlist)):
-                errname = "fuzzer%0.5d" % i
-                errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
-                self.errorlist.append(Error(errfile, self.analyzedfunc))
-        else:
+        # Convert AsanErrors to ktests (and ktest.errs)
+        for i in range(0, len(asanerrorlist)):
+            errname = "fuzzer%0.5d" % i
+            errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
+            self.errorlist.append(Error(errfile, self.analyzedfunc))
+
+        if any(not path.exists(d) for d in inputdirectories):
             print("Couldn't fuzz: " + self.analyzedfunc)
 
 
@@ -104,7 +107,7 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, cflags = None):
+    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False):
         """
         Compile necessary binaries and save the names to them
         """
@@ -121,6 +124,8 @@ class FuzzManager:
         environ["AFL_NO_UI"] = "1"
         environ["AFL_QUIET"] = "1"
         environ["AFL_SKIP_CRASHES"] = "1"
+        if(stop_when_done):
+            environ["AFL_EXIT_WHEN_DONE"] = "1"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")
@@ -134,6 +139,7 @@ class FuzzManager:
 
         ## Compile helper functions
         # For afl
+        print("Compiling helper functions for fuzzer...")
         _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
         _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [initializer_source_path, "-o", initializer_afl_instrumented])
         # For reproducer
@@ -142,20 +148,24 @@ class FuzzManager:
 
         ## Instrument the bcfile
         # Add drivers
+        print("Instrument bc file with fuzzer drivers...")
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-insert-fuzzdriver",
             "-renamemain", "-mem2reg", bcfile, "-o", target_with_drivers])
         # Add with asan for reproducer
+        print("Adding asan for reproducer...")
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-enable-asan",
             "-asan", "-asan-module", target_with_drivers, "-o", target_with_drivers_and_asan])
 
 
         # Compile general driver
+        print("linking fuzz-target...")
         self.afltarget = path.join(builddir, "afl-target")
         _run_checked_silent_subprocess([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
         # Compile reproducer
+        print("linking reproducer...")
         self.reproducer = path.join(builddir, "reproducer")
         _run_checked_silent_subprocess([AFLCC, "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
 
@@ -172,8 +182,13 @@ class FuzzManager:
         """ Call the target to list all drivers, strip newline at end and split at newlines """
         return subprocess.check_output([self.afltarget, "--list-fuzz-drivers"]).decode("utf-8").strip().split('\n')
 
-    def execute_reproducer(self, functionname):
-        return subprocess.check_output([self.reproducer, "--fuzz-driver=" + functionname])
+    def execute_reproducer(self, inputfile, functionname):
+        infd = open(inputfile, "r")
+        (returncode, stdoutdata, stderrdata) = _run_subprocess(
+            [self.reproducer, "--fuzz-driver=" + functionname], stdin=infd)
+        ret = AsanResult(stderrdata, inputfile, functionname)
+        infd.close()
+        return ret
 
     def execute_afl_fuzz(self, functionname, outdir, fuzztime):
         errordir = path.join(outdir, "macke_errors")
@@ -197,11 +212,23 @@ class FuzzManager:
         except subprocess.CalledProcessError as ex:
             pass
 
-
         return FuzzResult(self, functionname, errordir, outdir);
 
+
+    def execute_afl_tmin(self, inputfile, outputfile, functionname):
+        _run_checked_silent_subprocess([AFLTMIN, "-t", "50", "-i", inputfile, "-o", outputfile, "--", self.afltarget, "--fuzz-driver=" + functionname])
+        return
+
     def minimize_crash(self, crashinputfile, asanerror, function):
-        # Stub at the moment
+        minimized_name = path.join(path.dirname(crashinputfile), "min_" + path.basename(crashinputfile))
+        # tmin fails on timeout - catch this case
+        try:
+            self.execute_afl_tmin(crashinputfile, minimized_name, function)
+            asanresult = self.execute_reproducer(minimized_name, function)
+            if asanresult.iserror and asanresult.stack == asanerror.stack:
+                return asanresult
+        except subprocess.CalledProcessError:
+            pass
         return asanerror
 
 

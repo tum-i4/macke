@@ -81,6 +81,22 @@ def main():
         help="Time to fuzz a single function (in minutes)"
     )
 
+    parser.add_argument(
+        '--stop-fuzz-when-done',
+        type=bool,
+        default=False,
+        help="Toggle to stop fuzzer when it determines, that it is done"
+    )
+
+
+    parser.add_argument(
+        '--exclude-known',
+        type=bool,
+        default=True,
+        help="Toggle to exclude known from phase two"
+    )
+
+
 
 
     check_config()
@@ -106,7 +122,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, posixflags, posix4main, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time)
+                  False, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ class Macke:
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
                  exclude_known_from_phase_two=True, use_fuzzer=False,
-                 fuzztime=1):
+                 fuzztime=1, stop_fuzz_when_done=False):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -167,9 +167,9 @@ class Macke:
         if self.use_fuzzer:
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
+            self.create_macke_last_symlink()
             self.fuzz_manager = FuzzManager(self.program_bc, self.fuzzdir, builddir)
             self.fuzz_manager.init_empty_inputdir()
-            self.create_macke_last_symlink()
 
         # Print some information for the user
         self.qprint(

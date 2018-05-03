@@ -65,13 +65,16 @@ class AsanResult:
                 lno += 1
                 fno += 1
 
-    def convert_to_ktest(self, fuzzmanager, directory, testname, kleeargs = []):
+    def convert_to_ktest(self, fuzzmanager, directory, testname, kleeargs = None):
         """
         Creates a file <testname>.ktest and <testname>.ktest.err in directory
         Returns the name of the errfile
         """
         ktestname = path.join(directory, testname + ".ktest")
         ktesterrorname = path.join(directory, testname + ".fuzz.err")
+
+        if kleeargs is None:
+            kleeargs = []
 
         # Generate .ktest file
         fuzzmanager.run_ktest_converter(self.analyzedfunc, self.inputfile, ktestname, kleeargs)

@@ -5,6 +5,7 @@ from collections import OrderedDict
 from functools import total_ordering
 from os import path
 
+from .StackTrace import StackTrace
 
 @total_ordering
 class Error:
@@ -27,6 +28,9 @@ class Error:
 
         # Store an identifier for the vulnerable instruction "file:line"
         self.vulnerable_instruction = get_vulnerable_instruction(errfile)
+
+        # Store the stack trace for comparison
+        self.stacktrace = get_stacktrace(errfile, entryfunction)
 
     def __eq__(self, other):
         return ((self.entryfunction, self.errfile, self.reason,
@@ -112,3 +116,28 @@ def get_vulnerable_instruction(errfile):
             linenumline = int(file.readline().strip()[len("line: "):])
             return "%s:%s" % (filenameline, linenumline)
     return ""
+
+
+def get_stacktrace(errfile, entryfunction):
+    """ Extract the relevant parts of the stack trace from a .err file """
+    assert path.isfile(errfile)
+
+    err = open(errfile, 'r')
+
+    for line in err:
+        if line.startswith('Stack:'):
+            break
+
+    stack = []
+    for line in err:
+        if line.startswith('Info:'):
+            break
+        words = line.strip().split(' ')
+
+        # function name is 3th word
+        fname = words[3]
+
+        # location is last word
+        location = words[-1]
+        stack.append((fname, location))
+    return StackTrace(stack, entryfunction)
