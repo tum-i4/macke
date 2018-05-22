@@ -1,5 +1,6 @@
 
 from os import path
+import re
 
 class AsanResult:
     """
@@ -45,6 +46,7 @@ class AsanResult:
                 self.description = description.split(b' ')[0].decode("utf-8")
 
         self.stack = []
+        has_location = re.compile("^.*:[0-9]+:[0-9]+$")
         if self.has_stack_trace():
             # line number and frame-number
             lno = 0
@@ -61,6 +63,10 @@ class AsanResult:
 
                 # location is 5th word
                 location = words[4].decode("utf-8")
+                # remove line offset for klee compatibility
+                if has_location.match(location):
+                    location = location[:location.rfind(":")]
+
                 self.stack.append((fname, location))
                 lno += 1
                 fno += 1
@@ -91,7 +97,7 @@ class AsanResult:
             # The first number is the stack frame number + line number in assembly (here dummy 0)
             errcontent += "\t#" + str(i) + "0000000"
             # Function name + <unknown> arguments - to be tested
-            errcontent += " in " + self.stack[i][0] + "(<unknown>)"
+            errcontent += " in " + self.stack[i][0] + " (<unknown>)"
             # at location
             errcontent += " at " + self.stack[i][1] + "\n"
 
