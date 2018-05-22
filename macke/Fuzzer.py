@@ -9,7 +9,7 @@ import signal
 
 from os import environ, path, makedirs, listdir, kill
 
-from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
+from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, LLC, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
 
 from .Asan import AsanResult
 from .Error import Error
@@ -107,16 +107,18 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False):
+    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True):
         """
         Compile necessary binaries and save the names to them
         """
         self.cflags = [] if cflags is None else cflags
         self.fuzzdir = fuzzdir
-        self.inputdir = path.join(fuzzdir, "inputdir")
+        self.inputbasedir = path.join(fuzzdir, "input")
+        self.inputforfunc = dict()
         self.builddir = builddir
         self.orig_bcfile = bcfile
-        makedirs(self.inputdir)
+        self.smart_input = smart_input
+        makedirs(self.inputbasedir)
 
         ## Set necessary environment
         environ["AFL_PATH"] = AFLLIB
@@ -156,24 +158,41 @@ class FuzzManager:
         print("Adding asan for reproducer...")
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-enable-asan",
-            "-asan", "-asan-module", target_with_drivers, "-o", target_with_drivers_and_asan])
+            target_with_drivers, "-o", target_with_drivers_and_asan])
 
 
-        # Compile general driver
+
+        # link general driver
         print("linking fuzz-target...")
         self.afltarget = path.join(builddir, "afl-target")
         _run_checked_silent_subprocess([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
-        # Compile reproducer
+        # link reproducer
         print("linking reproducer...")
         self.reproducer = path.join(builddir, "reproducer")
-        _run_checked_silent_subprocess([AFLCC, "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
+        _run_checked_silent_subprocess([CLANG, "-v", "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
+
+        self.init_inputdirs()
 
 
+
+    def init_inputdirs(self):
+        functions = self.list_suitable_drivers()
+
+        if self.smart_input:
+            for f in functions:
+                inputdir = path.join(self.inputbasedir, f)
+                makedirs(inputdir)
+                self.inputforfunc[f] = inputdir
+                self.execute_inputgenerator(f, inputdir)
+        else:
+            self.init_empty_inputdir()
+            for f in functions:
+                self.inputforfunc[f] = self.inputbasedir
 
     def init_empty_inputdir(self):
-        if _dir_contains_no_files(self.inputdir):
-            dummy_file = path.join(self.inputdir, "dummy.input")
+        if _dir_contains_no_files(self.inputbasedir):
+            dummy_file = path.join(self.inputbasedir, "dummy.input")
             f = open(dummy_file, "w")
             f.write("a")
             f.close()
@@ -181,6 +200,10 @@ class FuzzManager:
     def list_suitable_drivers(self):
         """ Call the target to list all drivers, strip newline at end and split at newlines """
         return subprocess.check_output([self.afltarget, "--list-fuzz-drivers"]).decode("utf-8").strip().split('\n')
+
+
+    def execute_inputgenerator(self, func, targetdir):
+        subprocess.check_output([self.afltarget, "--generate-for=" + func, targetdir])
 
     def execute_reproducer(self, inputfile, functionname):
         infd = open(inputfile, "r")
@@ -196,7 +219,7 @@ class FuzzManager:
         makedirs(errordir)
 
         outfd = open(path.join(outdir, "output.txt"), "w")
-        proc = subprocess.Popen([AFLFUZZ, "-i", self.inputdir, "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
+        proc = subprocess.Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
 
         time.sleep(fuzztime)
         kill(proc.pid, signal.SIGINT)

@@ -88,6 +88,20 @@ def main():
         help="Toggle to stop fuzzer when it determines, that it is done"
     )
 
+    parser.add_argument(
+        '--generate-smart-fuzz-input',
+        type=bool,
+        default=True,
+        help="Toggle to generate better input for the fuzzing engine"
+    )
+
+    parser.add_argument(
+        '--fuzz-bc',
+        metavar=".bc-file",
+        type=argparse.FileType('r'),
+        help="Bitcode file, that will be used for fuzzing"
+    )
+
 
     parser.add_argument(
         '--exclude-known',
@@ -122,7 +136,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done)
+                  False, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=args.fuzz_bc.name)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

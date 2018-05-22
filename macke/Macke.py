@@ -43,9 +43,15 @@ class Macke:
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
                  exclude_known_from_phase_two=True, use_fuzzer=False,
-                 fuzztime=1, stop_fuzz_when_done=False):
+                 fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
+                 fuzzbc=None):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
+
+        if fuzzbc is None:
+            fuzzbc = bitcodefile
+        else:
+            assert path.isfile(fuzzbc)
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
@@ -96,6 +102,9 @@ class Macke:
         if use_fuzzer:
             self.fuzztime = fuzztime
             self.fuzzdir = path.join(self.rundir, "fuzzer")
+            self.fuzzbc = fuzzbc
+            self.fuzz_smartinput = generate_smart_fuzz_input
+            self.fuzz_stop_when_done = stop_fuzz_when_done
 
     def get_next_klee_directory(self, info):
         """
@@ -168,8 +177,7 @@ class Macke:
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
-            self.fuzz_manager = FuzzManager(self.program_bc, self.fuzzdir, builddir)
-            self.fuzz_manager.init_empty_inputdir()
+            self.fuzz_manager = FuzzManager(self.fuzzbc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput)
 
         # Print some information for the user
         self.qprint(
