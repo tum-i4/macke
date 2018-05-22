@@ -4,7 +4,6 @@ class StackTrace:
     def __init__(self, stack, entryfunc):
         # Store the entry func, this is needed for prepending a stack
         self.entryfunction = entryfunc
-        self.stack = stack
 
         self.entryFrame = 0
         for (fname, _) in stack:
@@ -12,9 +11,14 @@ class StackTrace:
                 break
             self.entryFrame += 1
 
+        self.stack = stack[:self.entryFrame + 1]
+
 
     def __eq__(self, other):
         return self.stack == other.stack
+
+    def __str__(self):
+        return str(self.stack)
 
     def is_contained_in(self, other):
         slen = len(self.stack)

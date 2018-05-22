@@ -135,7 +135,11 @@ def get_stacktrace(errfile, entryfunction):
         words = line.strip().split(' ')
 
         # function name is 3th word
-        fname = words[3]
+        fname = words[2]
+
+        # Don't put __macke_error helper functions in stack trace
+        if fname.startswith("__macke_error_"):
+            continue
 
         # location is last word
         location = words[-1]

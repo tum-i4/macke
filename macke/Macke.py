@@ -185,12 +185,6 @@ class Macke:
         self.callgraph = CallGraph(self.bitcodefile)
 
 
-        if self.use_fuzzer:
-            tasks = self.fuzz_manager.list_suitable_drivers()
-            self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
-                         % (len(tasks), len(self.callgraph.graph)))
-            self.qprint("Phase 1: Performing afl-fuzz runs ...")
-
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.list_symbolic_encapsulable(
             removemain=not bool(self.posix4main))
@@ -208,7 +202,17 @@ class Macke:
             if functionname != "main":
                 encapsulate_symbolic(self.symmains_bc, functionname)
         self.qprint(" done")
-        self.qprint("Phase 1: Performing KLEE runs ...")
+
+
+        if self.use_fuzzer:
+            tasks = self.fuzz_manager.list_suitable_drivers()
+            self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
+                         % (len(tasks), len(self.callgraph.graph)))
+
+        if self.use_fuzzer:
+            self.qprint("Phase 1: Performing afl-fuzz runs ...")
+        else:
+            self.qprint("Phase 1: Performing KLEE runs ...")
 
         pbar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
@@ -217,8 +221,9 @@ class Macke:
         if not self.quiet:
             pbar.finish()
 
-        self.qprint("Phase 1: Found %d KLEE errors spread over %d functions" %
-                    (self.errorregistry.errorcounter,
+        self.qprint("Phase 1: Found %d unique errors(total: %d) spread over %d functions" %
+                    (self.errorregistry.count_unique_errors(),
+                     self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
 
     def run_phase_two(self):
@@ -266,8 +271,9 @@ class Macke:
 
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
                     (self.testcases, self.kleecount))
-        self.qprint("Summary: %d errors were detected spread over %d "
+        self.qprint("Summary: %d unique errors (in total %d) were detected spread over %d "
                     "functions" % (
+                        self.errorregistry.count_unique_errors(),
                         self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
