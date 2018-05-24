@@ -110,6 +110,13 @@ def main():
         help="Toggle to exclude known from phase two"
     )
 
+    parser.add_argument(
+        '--quiet',
+        dest='quiet',
+        action='store_true'
+    )
+    parser.set_defaults(quiet=False)
+
 
 
 
@@ -136,7 +143,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  False, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=args.fuzz_bc.name)
+                  args.quiet, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=args.fuzz_bc.name)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

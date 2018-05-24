@@ -177,7 +177,7 @@ class Macke:
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
-            self.fuzz_manager = FuzzManager(self.fuzzbc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput)
+            self.fuzz_manager = FuzzManager(self.fuzzbc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.qprint)
 
         # Print some information for the user
         self.qprint(

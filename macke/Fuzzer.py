@@ -91,7 +91,7 @@ class FuzzResult:
             self.errorlist.append(Error(errfile, self.analyzedfunc))
 
         if any(not path.exists(d) for d in inputdirectories):
-            print("Couldn't fuzz: " + self.analyzedfunc)
+            self.fuzzmanager.print_func("Couldn't fuzz: " + self.analyzedfunc)
 
 
     def get_outname(self):
@@ -107,7 +107,7 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True):
+    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True, print_func=print):
         """
         Compile necessary binaries and save the names to them
         """
@@ -118,6 +118,7 @@ class FuzzManager:
         self.builddir = builddir
         self.orig_bcfile = bcfile
         self.smart_input = smart_input
+        self.print_func = print_func
         makedirs(self.inputbasedir)
 
         ## Set necessary environment
@@ -141,7 +142,7 @@ class FuzzManager:
 
         ## Compile helper functions
         # For afl
-        print("Compiling helper functions for fuzzer...")
+        self.print_func("Compiling helper functions for fuzzer...")
         _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
         _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [initializer_source_path, "-o", initializer_afl_instrumented])
         # For reproducer
@@ -150,12 +151,12 @@ class FuzzManager:
 
         ## Instrument the bcfile
         # Add drivers
-        print("Instrument bc file with fuzzer drivers...")
+        self.print_func("Instrument bc file with fuzzer drivers...")
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-insert-fuzzdriver",
             "-renamemain", "-mem2reg", bcfile, "-o", target_with_drivers])
         # Add with asan for reproducer
-        print("Adding asan for reproducer...")
+        self.print_func("Adding asan for reproducer...")
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-enable-asan",
             target_with_drivers, "-o", target_with_drivers_and_asan])
@@ -163,12 +164,12 @@ class FuzzManager:
 
 
         # link general driver
-        print("linking fuzz-target...")
+        self.print_func("linking fuzz-target...")
         self.afltarget = path.join(builddir, "afl-target")
         _run_checked_silent_subprocess([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
         # link reproducer
-        print("linking reproducer...")
+        self.print_func("linking reproducer...")
         self.reproducer = path.join(builddir, "reproducer")
         _run_checked_silent_subprocess([CLANG, "-v", "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
 
