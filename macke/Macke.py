@@ -106,6 +106,21 @@ class Macke:
             self.fuzz_smartinput = generate_smart_fuzz_input
             self.fuzz_stop_when_done = stop_fuzz_when_done
 
+
+    def save_options(self, to):
+        with open(to, 'w') as file:
+            options = OrderedDict()
+
+            options["exclude_known"] = self.exclude_known_from_phase_two
+            options["klee-max-time"] = int(next(filter(lambda f : f.startswith("--max-time="), self.flags_user))[len("--max-time="):])
+            options["use_fuzzer"] = self.use_fuzzer
+            if self.use_fuzzer:
+                options["fuzz-time"] = self.fuzztime
+                options["fuzz-stop-when-done"] = self.fuzz_stop_when_done
+                options["fuzz-smart-input"] = self.fuzz_smartinput
+
+            json.dump(options, file)
+
     def get_next_klee_directory(self, info):
         """
         Get the name for the next KLEE output directory and register the name
@@ -163,9 +178,13 @@ class Macke:
             info["llvm-opt-git-version-hash"] = get_llvm_opt_git_hash()
             info["klee-git-version-hash"] = get_klee_git_hash()
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
+            if self.use_fuzzer:
+                info["fuzzer-bitcodefile"] = path.abspath(self.fuzzbc)
             info["run-argv"] = sys.argv
             info["comment"] = self.comment
             json.dump(info, file)
+
+        self.save_options(path.join(self.rundir, "options.json"))
 
         # Initialize a file for klee directory mapping
         with open(self.kleejson, 'w') as file:
@@ -200,6 +219,9 @@ class Macke:
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
+        self.count_phase1_functions = len(tasks)
+        self.count_functions = len(self.callgraph.graph)
+
         self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
 
         # Copy the program bc before encapsulating everything symbolically
@@ -214,6 +236,7 @@ class Macke:
 
         if self.use_fuzzer:
             tasks = self.fuzz_manager.list_suitable_drivers()
+            self.count_phase1_functions = len(tasks)
             self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
                          % (len(tasks), len(self.callgraph.graph)))
 
@@ -224,6 +247,8 @@ class Macke:
 
         pbar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
+
+        self.starttimephase1 = datetime.now()
         self.__execute_in_parallel_threads(tasks, 1, pbar)
 
         if not self.quiet:
@@ -233,6 +258,8 @@ class Macke:
                     (self.errorregistry.count_unique_errors(),
                      self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
+
+        self.phase_one_summary = (self.errorregistry.count_unique_errors(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors())
 
     def run_phase_two(self):
         """
@@ -270,6 +297,8 @@ class Macke:
         self.qprint("Phase 2: %d additional KLEE analyzes propagate %d "
                     "errors" % (qualified - totallyskipped,
                                 self.errorregistry.mackerrorcounter))
+        self.phase2_runs = qualified - totallyskipped
+        self.propagated = self.errorregistry.mackerrorcounter
 
     def run_finalization(self):
         """
@@ -289,11 +318,32 @@ class Macke:
         with open(self.kleejson, 'a') as file:
             file.write("}")
 
+        with open(path.join(self.rundir, "summary.json"), 'w') as file:
+            info = OrderedDict()
+
+            p1_uniq, p1_errc, p1_errf = self.phase_one_summary
+            info["num-functions"] = self.count_functions
+            info["phase-one-functions"] = self.count_phase1_functions
+            info["phase-one-unique-errors"] = p1_uniq
+            info["phase-one-error-count"] = p1_errc
+            info["phase-one-count-error-funcs"] = p1_errf
+
+            info["phase-two-runs"] = self.phase2_runs
+            info["phase-two-propagated"] = self.propagated
+
+            info["total-unique-errors"] = self.errorregistry.count_unique_errors()
+            info["total-error-count"] = self.errorregistry.errorcounter
+            info["total-count-error-funcs"] = self.errorregistry.count_functions_with_errors()
+
+            json.dump(info, file)
+
+
         # Export all the data gathered so far to a json file
         with open(path.join(self.rundir, "timing.json"), 'w') as file:
             info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
+            info["start-phase-one"] = self.starttimephase1.isoformat()
             info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
 
