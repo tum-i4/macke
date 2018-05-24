@@ -7,6 +7,13 @@ from .config import check_config
 from .Macke import Macke
 
 
+def str2bool(v):
+    if v.lower() in ("yes", "true", "y", "t", "1"):
+        return True
+    if v.lower() in ("no", "false", "n", "f", "0"):
+        return False
+    raise argparse.ArgumentTypeError("Expected boolean value.")
+
 def main():
     """
     Parse command line arguments, initialize and start a complete MACKE run
@@ -69,7 +76,7 @@ def main():
 
     parser.add_argument(
         '--use-fuzzer',
-        type=bool,
+        type=str2bool,
         default=False,
         help="Toggle to use experimental fuzzing feature"
     )
@@ -83,14 +90,14 @@ def main():
 
     parser.add_argument(
         '--stop-fuzz-when-done',
-        type=bool,
+        type=str2bool,
         default=False,
         help="Toggle to stop fuzzer when it determines, that it is done"
     )
 
     parser.add_argument(
         '--generate-smart-fuzz-input',
-        type=bool,
+        type=str2bool,
         default=True,
         help="Toggle to generate better input for the fuzzing engine"
     )
@@ -105,7 +112,7 @@ def main():
 
     parser.add_argument(
         '--exclude-known',
-        type=bool,
+        type=str2bool,
         default=True,
         help="Toggle to exclude known from phase two"
     )
