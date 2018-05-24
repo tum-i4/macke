@@ -9,7 +9,7 @@ import signal
 
 from os import environ, path, makedirs, listdir, kill
 
-from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, LLC, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
+from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
 
 from .Asan import AsanResult
 from .Error import Error
