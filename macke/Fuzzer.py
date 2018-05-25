@@ -69,6 +69,10 @@ class FuzzResult:
 
         inputdirectories = [inputcorpus, crashcorpus]
 
+        if any(not path.exists(d) for d in inputdirectories):
+            self.fuzzmanager.print_func("Couldn't fuzz: " + self.analyzedfunc)
+            return
+
         for d in inputdirectories:
             for f in listdir(d):
                 if not f.startswith("id:"):
@@ -90,8 +94,6 @@ class FuzzResult:
             errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
             self.errorlist.append(Error(errfile, self.analyzedfunc))
 
-        if any(not path.exists(d) for d in inputdirectories):
-            self.fuzzmanager.print_func("Couldn't fuzz: " + self.analyzedfunc)
 
 
     def get_outname(self):
