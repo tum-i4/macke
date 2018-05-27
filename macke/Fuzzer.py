@@ -225,9 +225,12 @@ class FuzzManager:
         proc = subprocess.Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
 
         time.sleep(fuzztime)
-        kill(proc.pid, signal.SIGINT)
-        # wait for afl-fuzz to cleanup
-        proc.wait();
+        try:
+            kill(proc.pid, signal.SIGINT)
+            # wait for afl-fuzz to cleanup
+            proc.wait();
+        except OSError:
+            pass
         outfd.close()
 
         # afl-fuzz sometimes does not cleanup the target correctly, do it here
