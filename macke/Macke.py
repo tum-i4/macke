@@ -100,6 +100,7 @@ class Macke:
         # Setting the fuzzdir
         self.use_fuzzer = use_fuzzer
         if use_fuzzer:
+            self.fuzz_program_bc = path.join(self.bcdir, "fuzz.bc")
             self.fuzz_input_maxlen = fuzz_input_maxlen
             self.fuzztime = fuzztime
             self.fuzzdir = path.join(self.rundir, "fuzzer")
@@ -195,6 +196,8 @@ class Macke:
 
         # Initialize fuzzing
         if self.use_fuzzer:
+            # copy the unmodified bitcode file (fuzzer one)
+            shutil.copy2(self.fuzzbc, self.fuzz_program_bc)
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
