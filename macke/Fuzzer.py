@@ -109,7 +109,7 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True, print_func=print):
+    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
         """
         Compile necessary binaries and save the names to them
         """
@@ -121,6 +121,7 @@ class FuzzManager:
         self.orig_bcfile = bcfile
         self.smart_input = smart_input
         self.print_func = print_func
+        self.input_maxlen = input_maxlen
         makedirs(self.inputbasedir)
 
         ## Set necessary environment
@@ -206,7 +207,7 @@ class FuzzManager:
 
 
     def execute_inputgenerator(self, func, targetdir):
-        subprocess.check_output([self.afltarget, "--generate-for=" + func, targetdir])
+        subprocess.check_output([self.afltarget, "--generate-for=" + func, targetdir, str(self.input_maxlen)])
 
     def execute_reproducer(self, inputfile, functionname):
         infd = open(inputfile, "r")

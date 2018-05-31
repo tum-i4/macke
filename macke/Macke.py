@@ -44,7 +44,7 @@ class Macke:
                  flags_user=None, posixflags=None, posix4main=None,
                  exclude_known_from_phase_two=True, use_fuzzer=False,
                  fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
-                 fuzzbc=None):
+                 fuzzbc=None, fuzz_input_maxlen=32):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -100,6 +100,7 @@ class Macke:
         # Setting the fuzzdir
         self.use_fuzzer = use_fuzzer
         if use_fuzzer:
+            self.fuzz_input_maxlen = fuzz_input_maxlen
             self.fuzztime = fuzztime
             self.fuzzdir = path.join(self.rundir, "fuzzer")
             self.fuzzbc = fuzzbc
@@ -118,6 +119,7 @@ class Macke:
                 options["fuzz-time"] = self.fuzztime
                 options["fuzz-stop-when-done"] = self.fuzz_stop_when_done
                 options["fuzz-smart-input"] = self.fuzz_smartinput
+                options["fuzz-input-maxlen"] = self.fuzz_input_maxlen
 
             json.dump(options, file)
 
@@ -196,7 +198,7 @@ class Macke:
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
-            self.fuzz_manager = FuzzManager(self.fuzzbc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.qprint)
+            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen, self.qprint)
 
         # Print some information for the user
         self.qprint(

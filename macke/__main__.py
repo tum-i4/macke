@@ -103,6 +103,13 @@ def main():
     )
 
     parser.add_argument(
+        '--fuzz-input-maxlen',
+        type=int,
+        default=32,
+        help="Maximum array argument length for pregenerated inputs"
+    )
+
+    parser.add_argument(
         '--fuzz-bc',
         metavar=".bc-file",
         type=argparse.FileType('r'),
@@ -150,7 +157,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  args.quiet, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=args.fuzz_bc.name)
+                  args.quiet, flags_user, posixflags, posix4main, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=args.fuzz_bc.name, fuzz_input_maxlen=args.fuzz_input_maxlen)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":
