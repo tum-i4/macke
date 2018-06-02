@@ -34,8 +34,8 @@ def _run_subprocess(*args, **kwargs):
             output += o
             err += e
     # On hangup kill the program
-    except TimeoutExpired:
-        p.kill(SIGKILL)
+    except subprocess.TimeoutExpired:
+        p.kill()
 
     return p.returncode, output, err
 
