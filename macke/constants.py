@@ -10,6 +10,7 @@ KLEEFLAGS = [
     "--max-memory=1000",
     "--only-output-states-covering-new",
     "--optimize",
+    "--disable-inlining",
     # "--output-module",  # Helpful for debugging
     "--output-source=false",  # Removing this is helpful for debugging
     "--posix-runtime",
