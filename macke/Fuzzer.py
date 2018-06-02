@@ -28,10 +28,14 @@ def _run_subprocess(*args, **kwargs):
     p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output = b""
     err = b""
-    while p.poll() is None:
-        (o, e) = p.communicate(None)
-        output += o
-        err += e
+    try:
+        while p.poll() is None:
+            (o, e) = p.communicate(None, timeout=1)
+            output += o
+            err += e
+    # On hangup kill the program
+    except TimeoutExpired:
+        p.kill(SIGKILL)
 
     return p.returncode, output, err
 
