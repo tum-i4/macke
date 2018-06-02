@@ -125,6 +125,13 @@ def main():
     )
 
     parser.add_argument(
+        '--libraries=',
+        type=lambda s : s.split(','),
+        default=None,
+        help="Libraries that are needed for linking (fuzzing only)"
+    )
+
+    parser.add_argument(
         '--quiet',
         dest='quiet',
         action='store_true'

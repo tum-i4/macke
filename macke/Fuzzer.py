@@ -40,6 +40,7 @@ def _run_subprocess(*args, **kwargs):
     return p.returncode, output, err
 
 
+
 class FuzzResult:
     """
     Container, that stores all information about a afl fuzzing run
@@ -113,11 +114,12 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
+    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
         """
         Compile necessary binaries and save the names to them
         """
         self.cflags = [] if cflags is None else cflags
+        self.lflags = [] if lflags is None else lflags
         self.fuzzdir = fuzzdir
         self.inputbasedir = path.join(fuzzdir, "input")
         self.inputforfunc = dict()
@@ -173,12 +175,12 @@ class FuzzManager:
         # link general driver
         self.print_func("linking fuzz-target...")
         self.afltarget = path.join(builddir, "afl-target")
-        _run_checked_silent_subprocess([AFLCC] + self.cflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
+        _run_checked_silent_subprocess([AFLCC] + self.lflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
         # link reproducer
         self.print_func("linking reproducer...")
         self.reproducer = path.join(builddir, "reproducer")
-        _run_checked_silent_subprocess([CLANG, "-v", "-fsanitize=address"] + self.cflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
+        _run_checked_silent_subprocess([CLANG, "-v", "-fsanitize=address"] + self.lflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
 
         self.init_inputdirs()
 

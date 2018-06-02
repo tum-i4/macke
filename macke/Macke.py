@@ -42,7 +42,8 @@ class Macke:
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
-                 exclude_known_from_phase_two=True, use_fuzzer=False,
+                 exclude_known_from_phase_two=True, use_fuzzer=False, libraries=None,
+                 fuzzlibdir=None,
                  fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
                  fuzzbc=None, fuzz_input_maxlen=32):
         # Only accept valid files and directory
@@ -56,12 +57,21 @@ class Macke:
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
+        # add libraries to flags_user
+        self.flags_user = []
+        if libraries is not None:
+            for l in library:
+                if l not in UCLIBC_LIBS:
+                    self.flags_user.append("-load=lib"+l+".so")
+
+
         # Store information from command line
         self.comment = comment
-        self.flags_user = flags_user if flags_user is not None else []
+        self.flags_user += flags_user if flags_user is not None else []
         self.posixflags = posixflags if posixflags is not None else []
         self.posix4main = posix4main if posix4main is not None else []
         self.exclude_known_from_phase_two = exclude_known_from_phase_two
+
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
@@ -100,6 +110,10 @@ class Macke:
         # Setting the fuzzdir
         self.use_fuzzer = use_fuzzer
         if use_fuzzer:
+            self.fuzz_lflags = []
+            if fuzzlibdir is not None:
+                self.fuzz_lflags += [ "-L" + path.abspath(fuzzlibdir) ]
+            self.fuzz_lflags += list(map(lambda s: "-l" + s, libraries)) if libraries is not None else []
             self.fuzz_program_bc = path.join(self.bcdir, "fuzz.bc")
             self.fuzz_input_maxlen = fuzz_input_maxlen
             self.fuzztime = fuzztime
@@ -201,7 +215,7 @@ class Macke:
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
-            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen, self.qprint)
+            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen, self.qprint)
 
         # Print some information for the user
         self.qprint(
