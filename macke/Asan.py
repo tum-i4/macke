@@ -23,7 +23,7 @@ class AsanResult:
         if self.stack:
             location = self.stack[0][1]
             # Split into file, linenumber
-            splits = location[:location.rfind(':')].split(':')
+            splits = location.split(':')
             if len(splits) > 1:
                 return splits[0], splits[1]
             return splits[0], "0"
