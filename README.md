@@ -1,6 +1,7 @@
 # MACKE - `M`odular `a`nd `C`ompositional Analysis with `K`LEE `E`ngine
 
 (A mirror of this repo is hosted at https://gitlab.lrz.de/saahil/macke)
+
 MACKE is a wrapper around [KLEE](https://klee.github.io/), that decomposes the analyzed programs into several smaller units, analyze these seperately and finally merge all found errors to one interactive report. Please read the [MACKE-paper](https://www.researchgate.net/publication/305641321_MACKE_-_Compositional_Analysis_of_Low-Level_Vulnerabilities_with_Symbolic_Execution) for more details.
 
 ## Installation guide
