@@ -17,6 +17,7 @@ from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import (CONFIGFILE, THREADNUM, get_current_git_hash,
                      get_klee_git_hash, get_llvm_opt_git_hash)
+from .constants import UCLIBC_LIBS
 from .ErrorRegistry import ErrorRegistry
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
@@ -60,7 +61,7 @@ class Macke:
         # add libraries to flags_user
         self.flags_user = []
         if libraries is not None:
-            for l in library:
+            for l in libraries:
                 if l not in UCLIBC_LIBS:
                     self.flags_user.append("-load=lib"+l+".so")
 
