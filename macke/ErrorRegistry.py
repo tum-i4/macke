@@ -5,6 +5,7 @@ from os import listdir, path
 
 from .constants import ERRORFILEEXTENSIONS
 from .Error import Error
+from .ErrorChain import ErrorChain
 
 
 class ErrorRegistry:
@@ -21,23 +22,18 @@ class ErrorRegistry:
         self.mackeforerrfile = dict()
         self.list_forerrfile = dict()
 
+        self.forheadstackentry = dict()
+
         self.errorcounter = 0
         self.mackerrorcounter = 0
 
-        self.unique_vulnerabilities = []
+        self.errorchains = []
 
-    def count_unique_errors(self):
-        return len(self.unique_vulnerabilities)
+    def count_chains(self):
+        return len(self.errorchains)
 
-    def find_unique_bucket(self, error):
-        for bucket in self.unique_vulnerabilities:
-            representative = bucket[-1]
-            if representative.stacktrace.is_contained_in(error.stacktrace) or error.stacktrace.is_contained_in(representative.stacktrace):
-                return bucket
-
-        ret = []
-        self.unique_vulnerabilities.append(ret)
-        return ret
+    def get_chains(self):
+        return self.errorchains
 
     def create_from_dir(self, kleedir, entryfunction):
         """ register all errors from directory """
@@ -54,6 +50,31 @@ class ErrorRegistry:
         if not err.is_blacklisted():
             self.register_error(err)
 
+    def build_chain_for_error(self, error):
+        """
+        Used when error matched no errorchain, thus create a new one
+        look for all lower-level errors that also match in the new chain
+        """
+        new_chain = ErrorChain(error)
+        for index in new_chain.trace.get_indices():
+            if index not in self.forheadstackentry:
+                continue
+            for e in self.forheadstackentry[index]:
+                if new_chain.error_matches(e):
+                    new_chain.add_error(e)
+        self.errorchains.append(new_chain)
+        return new_chain
+
+    def add_to_chains(self, error):
+        added = False
+        for chain in self.errorchains:
+            if chain.error_matches(error):
+                increased = chain.add_error(error)
+                added = True
+        if not added:
+            self.build_chain_for_error(error)
+
+
     def register_error(self, error):
         """ register an existing error """
 
@@ -64,28 +85,25 @@ class ErrorRegistry:
 
             # Exclude all MACKE errors based on black listed errors
             if testfrom not in self.forerrfile:
+                print("testfrom not found...: " + testfrom)
+                print("error.errfile: " + error.errfile)
                 return
 
             self.mackerrorcounter += 1
             add_to_listdict(self.mackeforerrfile, testfrom, error)
 
-            # Save it into the unique variable list
-            self.list_forerrfile[testfrom].append(error)
-
             # Propagate information about the vulnerable instruction
             preverr = self.forerrfile[testfrom]
             error.vulnerable_instruction = str(preverr.vulnerable_instruction)
             error.stacktrace.prepend(preverr.stacktrace)
-        else:
-            uniq_bucket = self.find_unique_bucket(error)
-            self.list_forerrfile[error.errfile] = uniq_bucket
-            uniq_bucket.append(error)
 
         add_to_listdict(self.forfunction, error.entryfunction, error)
         self.forerrfile[error.errfile] = error
         self.errorcounter += 1
 
         add_to_listdict(self.forvulninst, error.vulnerable_instruction, error)
+        self.add_to_chains(error)
+        add_to_listdict(self.forheadstackentry, error.stacktrace.get_head_index(), error)
 
     def count_vulnerable_instructions(self):
         """

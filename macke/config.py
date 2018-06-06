@@ -24,6 +24,8 @@ LLVMBINDIR = subprocess.check_output([LLVMCONFIG, "--bindir"]).decode("utf-8").s
 CLANG = path.join(LLVMBINDIR, "clang")
 LLVMFUZZOPT = path.join(LLVMBINDIR, "opt")
 
+VALGRIND = path.expanduser(CONFIG.get("binaries", "valgrind"))
+
 # for symbolic execution
 LIBMACKEOPT = path.expanduser(CONFIG.get("binaries", "libmackeopt"))
 LLVMOPT = path.expanduser(CONFIG.get("binaries", "llvmopt", fallback="opt"))

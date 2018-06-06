@@ -22,6 +22,8 @@ UCLIBC_LIBS = [
     "acl", "crypt", "dl", "m", "pthread", "rt", "selinux"
 ]
 
+FUZZFUNCDIR_PREFIX = "fuzz_out_"
+
 # A list of file extensions for errors that can be prepended by phase two
 ERRORFILEEXTENSIONS = [
     ".ptr.err", ".free.err", ".assert.err", ".div.err", ".macke.err", ".fuzz.err"]

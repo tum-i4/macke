@@ -23,7 +23,7 @@ class StackTrace:
     def is_contained_in(self, other):
         slen = len(self.stack)
         olen = len(other.stack)
-        if slen >= olen:
+        if slen > olen:
             return False
 
         for i in range(slen):
@@ -40,10 +40,34 @@ class StackTrace:
         """
 
         call_pos = 0
-        for (fname, _) in self.stack:
-            if fname == other.entryfunction:
-                break
-            call_pos += 1
 
         old_stack = self.stack
-        self.stack = other.stack[:other.entryFrame + 1] + self.stack[call_pos + 1:] 
+        self.stack = other.stack[:other.entryFrame + 1] + self.stack 
+
+
+    def get_depth(self):
+        return len(self.stack)
+
+    def get_indices(self):
+        """
+        Return a list of (depth, function, location), representing each entry
+        This tuple can be hashed to find possible candidates
+        Note, that the last call has depth 0, so that it does not change,
+        when prepending stacktraces
+        """
+        ret = []
+        cur_depth = 0
+        for (func, loc) in self.stack:
+            ret.append((cur_depth, func, loc))
+            cur_depth += 1
+        assert(cur_depth == self.get_depth())
+        return ret
+
+
+    def get_head(self):
+        return self.stack[-1]
+
+    def get_head_index(self):
+        func, loc = self.get_head()
+        depth = self.get_depth()
+        return (depth - 1, func, loc)

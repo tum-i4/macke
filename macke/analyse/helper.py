@@ -4,7 +4,7 @@ Some helping functions to reduce the duplicate code for stand alone evaluation
 import argparse
 import json
 from collections import OrderedDict
-from os import path
+from os import path, listdir
 
 from ..ErrorRegistry import ErrorRegistry
 
@@ -40,6 +40,26 @@ def store_as_json(macke_directory, filename, content):
         json.dump(content, file)
 
 
+def append_to_registry_from_fuzzdir(registry, fuzzdir):
+    prefix = "fuzz_out_"
+    for f in listdir(fuzzdir):
+        if not f.startswith(prefix):
+            continue
+        fpath = path.join(fuzzdir, f)
+        function = f[len(prefix):]
+        if path.islink(fpath) or not path.isdir(fpath):
+            continue
+
+        errordir = path.join(fpath, "macke_errors")
+
+        # sanity check
+        if path.islink(errordir) or not path.isdir(errordir):
+            continue
+        registry.create_from_dir(errordir, function)
+
+
+
+
 def get_klee_registry_from_mackedir(macke_directory):
     """
     Build an OrderedDict with informations about all KLEE runs in a MACKE run
@@ -55,8 +75,12 @@ def get_error_registry_for_mackedir(macke_directory):
     """
     Build an error Registry for a MACKE run
     """
+    macke_directory = path.abspath(macke_directory)
     registry = ErrorRegistry()
     klees = get_klee_registry_from_mackedir(macke_directory)
+
+    if path.isdir(path.join(macke_directory, "fuzzer")):
+        append_to_registry_from_fuzzdir(registry, path.join(macke_directory, "fuzzer"))
 
     for _, klee in klees.items():
         if "function" in klee:

@@ -17,7 +17,7 @@ from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import (CONFIGFILE, THREADNUM, get_current_git_hash,
                      get_klee_git_hash, get_llvm_opt_git_hash)
-from .constants import UCLIBC_LIBS
+from .constants import UCLIBC_LIBS, FUZZFUNCDIR_PREFIX
 from .ErrorRegistry import ErrorRegistry
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
@@ -274,12 +274,12 @@ class Macke:
         if not self.quiet:
             pbar.finish()
 
-        self.qprint("Phase 1: Found %d unique errors(total: %d) spread over %d functions" %
-                    (self.errorregistry.count_unique_errors(),
+        self.qprint("Phase 1: Found %d chains (errors: %d) spread over %d functions" %
+                    (self.errorregistry.count_chains(),
                      self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
 
-        self.phase_one_summary = (self.errorregistry.count_unique_errors(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors())
+        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors())
 
     def run_phase_two(self):
         """
@@ -328,9 +328,9 @@ class Macke:
 
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
                     (self.testcases, self.kleecount))
-        self.qprint("Summary: %d unique errors (in total %d) were detected spread over %d "
+        self.qprint("Summary: %d chains (errors: %d) were detected spread over %d "
                     "functions" % (
-                        self.errorregistry.count_unique_errors(),
+                        self.errorregistry.count_chains(),
                         self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
@@ -341,17 +341,17 @@ class Macke:
         with open(path.join(self.rundir, "summary.json"), 'w') as file:
             info = OrderedDict()
 
-            p1_uniq, p1_errc, p1_errf = self.phase_one_summary
+            p1_chain, p1_errc, p1_errf = self.phase_one_summary
             info["num-functions"] = self.count_functions
             info["phase-one-functions"] = self.count_phase1_functions
-            info["phase-one-unique-errors"] = p1_uniq
+            info["phase-one-chains"] = p1_chain
             info["phase-one-error-count"] = p1_errc
             info["phase-one-count-error-funcs"] = p1_errf
 
             info["phase-two-runs"] = self.phase2_runs
             info["phase-two-propagated"] = self.propagated
 
-            info["total-unique-errors"] = self.errorregistry.count_unique_errors()
+            info["total-chains"] = self.errorregistry.count_chains()
             info["total-error-count"] = self.errorregistry.errorcounter
             info["total-count-error-funcs"] = self.errorregistry.count_functions_with_errors()
 
@@ -450,7 +450,7 @@ class Macke:
         if phase == 1:
             for function in run:
                 if self.use_fuzzer:
-                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, resultlist, function, path.join(self.fuzzdir, "fuzz_out_" + function), self.fuzztime))
+                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
                 else:
                     pool.apply_async(thread_phase_one, (
                         resultlist, function, self.symmains_bc,

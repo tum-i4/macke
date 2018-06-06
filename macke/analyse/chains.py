@@ -18,31 +18,18 @@ def chains(macke_directory):
     registry = get_error_registry_for_mackedir(macke_directory)
     clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
 
-    errchains = reconstruct_all_error_chains(registry, clg)
-    chainlengths = [len(chain)
-                    for _, chainlist in errchains.items()
-                    for chain in chainlist]
+    funcs = set(clg.get_flattened_inverted_topology())
 
-    # Calculate old 1-level-up statistic
-    onelevelup = 0
-    for caller in clg.get_flattened_inverted_topology():
-        for callee in clg[caller]['calls']:
-            onelevelup += len(
-                registry.get_all_vulninst_for_func(caller) &
-                registry.get_all_vulninst_for_func(callee))
+    errchains = registry.get_chains()
+    chainlengths = [c.get_num_user_funcs(funcs) for c in errchains]
 
     # Count the end phases
     endphaseone, endphasetwo = 0, 0
-    for vulninst, chainlist in errchains.items():
-        for chain in chainlist:
-            # candidaterror are all errors, that end this chain
-            # normally, this is just one error, but circles can have several
-            if any(candidaterror.vulnerable_instruction == vulninst and
-                   candidaterror.errfile.endswith(".macke.err")
-                   for candidaterror in registry.forfunction[chain[-1]]):
-                endphasetwo += 1
-            else:
-                endphaseone += 1
+    for chain in errchains:
+        if any(err.errfile.endswith(".macke.err") for err in chain.get_head_errors()):
+            endphasetwo += 1
+        else:
+            endphaseone += 1
 
     result = OrderedDict([
         ("count", len(chainlengths)),
@@ -53,12 +40,38 @@ def chains(macke_directory):
             ("std", stdev(chainlengths) if len(chainlengths) > 2 else -1),
         ])),
         ("longerthanone", len([True for c in chainlengths if c > 1])),
-        ("1-level-up", onelevelup),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),
-        ("detail", errchains),
+        ("detail", list(c.filtered_trace(funcs)[::-1] for c in errchains)),
     ])
     return result
+    ## LEGACY
+    #errchains = reconstruct_all_error_chains(registry, clg)
+    #chainlengths = [len(chain)
+    #                for _, chainlist in errchains.items()
+    #                for chain in chainlist]
+
+    ## Calculate old 1-level-up statistic
+    #onelevelup = 0
+    #for caller in clg.get_flattened_inverted_topology():
+    #    for callee in clg[caller]['calls']:
+    #        onelevelup += len(
+    #            registry.get_all_vulninst_for_func(caller) &
+    #            registry.get_all_vulninst_for_func(callee))
+
+    ## Count the end phases
+    #endphaseone, endphasetwo = 0, 0
+    #for vulninst, chainlist in errchains.items():
+    #    for chain in chainlist:
+    #        # candidaterror are all errors, that end this chain
+    #        # normally, this is just one error, but circles can have several
+    #        if any(candidaterror.vulnerable_instruction == vulninst and
+    #               candidaterror.errfile.endswith(".macke.err")
+    #               for candidaterror in registry.forfunction[chain[-1]]):
+    #            endphasetwo += 1
+    #        else:
+    #            endphaseone += 1
+    # ("1-level-up", onelevelup),
 
 
 def main():

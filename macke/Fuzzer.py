@@ -6,13 +6,19 @@ All interactions with fuzzing
 import subprocess
 import time
 import signal
+import shutil
 
 from os import environ, path, makedirs, listdir, kill
+from multiprocessing import Manager, Pool
+import os
+import tempfile
 
-from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN
+from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN, THREADNUM
+from .constants import FUZZFUNCDIR_PREFIX
 
 from .Asan import AsanResult
 from .Error import Error
+from .callgrind import get_coverage
 
 
 def _dir_contains_no_files(dirname):
@@ -38,6 +44,87 @@ def _run_subprocess(*args, **kwargs):
         p.kill()
 
     return p.returncode, output, err
+
+
+def extract_fuzzer_coverage(macke_directory):
+    # Get absolute path since we are going to switch directories
+    macke_directory = path.abspath(macke_directory)
+    fuzzer_dir = path.join(macke_directory, "fuzzer")
+
+    if not path.exists(fuzzer_dir):
+        return dict()
+
+    # Look for afltarget
+    builddir = path.join(fuzzer_dir, "build")
+    if not path.exists(builddir):
+        return dict()
+
+    afltarget = path.join(builddir, "afl-target")
+    if not path.exists(afltarget) or not path.isfile(afltarget):
+        return dict()
+
+    # switch cwd for going through inputs
+    tmpdir = tempfile.mkdtemp(prefix="macke_tmp_callgrind_")
+
+    old_cwd = os.getcwd()
+    os.chdir(tmpdir)
+
+    environ["LIBC_FATAL_STDERR_"] = "1"
+    # gather coverage results in parallel
+    pool = Pool(THREADNUM)
+    manager = Manager()
+    queue = manager.Queue()
+
+    async_results = []
+
+    for fundir in listdir(fuzzer_dir):
+        if not fundir.startswith(FUZZFUNCDIR_PREFIX):
+            continue
+        analyzedfunc = fundir[len(FUZZFUNCDIR_PREFIX):]
+        fdpath = path.join(fuzzer_dir, fundir)
+        inputdirectories = [ path.join(fdpath, "queue"), path.join(fdpath, "crashes"), path.join(fdpath, "hangs") ]
+
+        # If a function could not be fuzzed
+        if any(not path.exists(d) for d in inputdirectories):
+            continue
+
+        args = [afltarget, "--fuzz-driver=" + analyzedfunc]
+
+        for d in inputdirectories:
+            for f in listdir(d):
+                # Only look at afl inputs
+                if not f.startswith("id:"):
+                    continue
+                inputfilename = path.join(d, f)
+                # When we miss permissions for file, add permissions
+                if not os.access(inputfilename, os.R_OK):
+                    os.chmod(inputfilename, stat.S_IRUSR)
+                if not path.isfile(inputfilename):
+                    continue
+
+                async_results.append(pool.apply_async(get_coverage, (args, inputfilename), callback=queue.put))
+    # After registering all jobs, close the pool
+    pool.close()
+
+    def process_queue():
+        while not queue.empty():
+            for file, info in queue.get().items():
+                if file in coverage:
+                    coverage[file]['covered'] |= info['covered']
+                else:
+                    coverage[file] = info
+
+    coverage = dict()
+    while async_results:
+        async_results = list(filter(lambda a : not a.ready(), async_results))
+        process_queue()
+        time.sleep(0.05)
+    pool.join()
+    process_queue()
+    os.chdir(old_cwd)
+    shutil.rmtree(tmpdir)
+    return coverage
+
 
 
 
@@ -87,7 +174,7 @@ class FuzzResult:
                     continue
                 self.testcount += 1
                 reproduced = self.fuzzmanager.execute_reproducer(fname, self.analyzedfunc)
-                if reproduced.iserror:
+                if reproduced.iserror and reproduced.has_stack_trace():
                     error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
                     self.errorcount += 1
                     self.errfiles.append(fname)
@@ -138,6 +225,8 @@ class FuzzManager:
         environ["AFL_SKIP_CRASHES"] = "1"
         if(stop_when_done):
             environ["AFL_EXIT_WHEN_DONE"] = "1"
+        # Print fatal errors on stderr instead of tty
+        environ["LIBC_FATAL_STDERR_"] = "1"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")

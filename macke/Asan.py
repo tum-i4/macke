@@ -72,6 +72,11 @@ class AsanResult:
                 lno += 1
                 fno += 1
 
+        # Ignore errors where the argument was freed and gets freed (again) in our driver
+        if (self.description.startswith("attempting double-free") and len(self.stack) > 0 and 
+            self.stack[1][0].startswith("__interceptor_free") and self.stack[1][1].startswith("macke_fuzzer_driver")):
+            self.iserror = False
+
     def convert_to_ktest(self, fuzzmanager, directory, testname, kleeargs = None):
         """
         Creates a file <testname>.ktest and <testname>.ktest.err in directory
@@ -89,7 +94,7 @@ class AsanResult:
         # Generate .ktest.err file
         errcontent = ("Error: " + self.description + "\n"
                    + "File: " + self.file + "\n"
-                   + "Line: " + self.line + "\n"
+                   + "line: " + self.line + "\n"
                    # Dummy assembly.ll line
                    + "assembly.ll line: 0\n"
                    + "Stack:\n")
