@@ -227,7 +227,6 @@ class FuzzManager:
             environ["AFL_EXIT_WHEN_DONE"] = "1"
         # Print fatal errors on stderr instead of tty
         environ["LIBC_FATAL_STDERR_"] = "1"
-        environ["ASAN_OPTIONS"] = "detect_leaks=0"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")
@@ -306,9 +305,11 @@ class FuzzManager:
         subprocess.check_output([self.afltarget, "--generate-for=" + func, targetdir, str(self.input_maxlen)])
 
     def execute_reproducer(self, inputfile, functionname):
+        menv = environ.copy()
+        menv["ASAN_OPTIONS"] = "detect_leaks=0"
         infd = open(inputfile, "r")
         (returncode, stdoutdata, stderrdata) = _run_subprocess(
-            [self.reproducer, "--fuzz-driver=" + functionname], stdin=infd)
+            [self.reproducer, "--fuzz-driver=" + functionname], stdin=infd, env=menv)
         ret = AsanResult(stderrdata, inputfile, functionname)
         infd.close()
         return ret
