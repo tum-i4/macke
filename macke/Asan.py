@@ -43,7 +43,8 @@ class AsanResult:
             if b"==ERROR:" in line:
                 description = line[line.find(b"Sanitizer:")+11:]
                 description.strip()
-                self.description = description.split(b' ')[0].decode("utf-8")
+                desc_parts = description.split(b' ')
+                self.description = b' '.join(desc_parts[0:desc_parts.index(b'on')]).decode("utf-8")
 
         self.stack = []
         has_location = re.compile("^.*:[0-9]+:[0-9]+$")
