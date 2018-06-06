@@ -227,6 +227,7 @@ class FuzzManager:
             environ["AFL_EXIT_WHEN_DONE"] = "1"
         # Print fatal errors on stderr instead of tty
         environ["LIBC_FATAL_STDERR_"] = "1"
+        environ["ASAN_OPTIONS"] = "detect_leaks=0"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")
