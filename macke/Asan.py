@@ -15,6 +15,9 @@ class AsanResult:
 
         if self.iserror:
             self.parse_asan_output()
+
+        # parse_asan_output might decide to set iserror to False
+        if self.iserror:
             self.file, self.line = self.get_vulnerable_instruction()
 
 
@@ -74,8 +77,9 @@ class AsanResult:
                 fno += 1
 
         # Ignore errors where the argument was freed and gets freed (again) in our driver
-        if (self.description.startswith("attempting double-free") and len(self.stack) > 0 and 
-            self.stack[1][0].startswith("__interceptor_free") and self.stack[1][1].startswith("macke_fuzzer_driver")):
+        if (self.description.startswith("attempting double-free") and ((len(self.stack) > 2 and
+            self.stack[1][0].startswith("__interceptor_free") and self.stack[2][0].startswith("macke_fuzzer_driver")) or
+            (len(self.stack) > 1 and self.stack[0][0].startswith("__interceptor_free") and self.stack[1][0].startswith("macke_fuzzer_driver")))):
             self.iserror = False
 
     def convert_to_ktest(self, fuzzmanager, directory, testname, kleeargs = None):
