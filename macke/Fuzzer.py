@@ -11,6 +11,7 @@ import shutil
 from os import environ, path, makedirs, listdir, kill
 from multiprocessing import Manager, Pool
 import os
+import stat
 import tempfile
 
 from .config import LIBMACKEOPT, LIBMACKEFUZZPATH, LIBMACKEFUZZOPT, LLVMOPT, LLVMFUZZOPT, CLANG, AFLBIN, AFLLIB, AFLCC, AFLFUZZ, AFLTMIN, THREADNUM
