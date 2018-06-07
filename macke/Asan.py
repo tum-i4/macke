@@ -49,7 +49,7 @@ class AsanResult:
                 desc_parts = description.split(b' ')
                 if b'on' in self.description:
                     self.description = b' '.join(desc_parts[0:desc_parts.index(b'on')]).decode("utf-8")
-                else
+                else:
                     self.description = desc_parts[0].decode("utf-8", 'ignore').rstrip(':')
 
         self.stack = []
