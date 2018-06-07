@@ -47,7 +47,10 @@ class AsanResult:
                 description = line[line.find(b"Sanitizer:")+11:]
                 description.strip()
                 desc_parts = description.split(b' ')
-                self.description = b' '.join(desc_parts[0:desc_parts.index(b'on')]).decode("utf-8")
+                if b'on' in self.description:
+                    self.description = b' '.join(desc_parts[0:desc_parts.index(b'on')]).decode("utf-8")
+                else
+                    self.description = desc_parts[0].decode("utf-8", 'ignore').rstrip(':')
 
         self.stack = []
         has_location = re.compile("^.*:[0-9]+:[0-9]+$")
