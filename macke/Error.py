@@ -14,6 +14,8 @@ class Error:
     """
 
     def __init__(self, errfile, entryfunction):
+        if '.' in entryfunction:
+            entryfunction = entryfunction[:entryfunction.index('.')]
         # Store the function, that was used as an entry point on the test case
         self.entryfunction = entryfunction
 
