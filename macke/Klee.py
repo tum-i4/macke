@@ -8,13 +8,34 @@ import re
 import shutil
 import subprocess
 import tempfile
+import signal
 
 from collections import OrderedDict
-from os import listdir, path, makedirs
+from os import listdir, path, makedirs, killpg, getpgid, setsid
 
 from .config import KLEEBIN
 from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
 
+
+# python implementation of timed check_output fails to kill klee correctly
+# Thus, write a working implementation ourself using killgroup
+# https://bugs.python.org/issue31935 and similar ones
+
+def _check_output(command, cwd, timeout):
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, preexec_fn=setsid)
+    try:
+        output, _ = proc.communicate(None, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        killpg(getpgid(proc.pid), signal.SIGKILL)
+        # timeout for sanity check
+        output, _ = proc.communicate(None, timeout=timeout)
+        raise subprocess.TimeoutExpired(proc.args, timeout, output=output)
+
+    retcode = proc.poll()
+
+    if retcode:
+        raise subprocess.CalledProcessError(retcode, proc.args, output=output)
+    return output
 
 class KleeResult:
     """
@@ -172,9 +193,9 @@ def execute_klee(
 
     # actually run KLEE
     try:
-        out = subprocess.check_output(
-            command, stderr=subprocess.STDOUT,
-            cwd=tmpdir, timeout=timeout).decode("utf-8", 'ignore')
+        out = _check_output(
+            command, cwd=tmpdir,
+            timeout=timeout).decode("utf-8", 'ignore')
     except subprocess.TimeoutExpired as terr:
         out = terr.output.decode("utf-8", 'ignore')
         out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
