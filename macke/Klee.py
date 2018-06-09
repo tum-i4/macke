@@ -47,7 +47,7 @@ class KleeResult:
         self.chained = []
         for errfile in self.errfiles:
             if errfile.endswith(".macke.err"):
-                with open(errfile, 'r') as file:
+                with open(errfile, 'r', errors='ignore') as file:
                     match = re.search(
                         r"ERROR FROM (.+\.err)\n", file.readline())
                 if match:

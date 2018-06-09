@@ -97,7 +97,7 @@ def get_reason_for_error(errfile):
     """ Extract the reason for an error from a .err file """
     assert path.isfile(errfile)
 
-    with open(errfile, "r") as file:
+    with open(errfile, "r", errors='ignore') as file:
         reason = file.readline()
         # The reason starts with "Error: "
         return reason[len("Error: "):].strip()
@@ -108,7 +108,7 @@ def get_vulnerable_instruction(errfile):
     """ Extract the vulnerable instruction "file:line" from a .err file """
     assert path.isfile(errfile)
 
-    with open(errfile, "r") as file:
+    with open(errfile, "r", errors='ignore') as file:
         # The first line contains the reason - irrelevant for vuln inst
         file.readline()
 
@@ -124,7 +124,7 @@ def get_stacktrace(errfile, entryfunction):
     """ Extract the relevant parts of the stack trace from a .err file """
     assert path.isfile(errfile)
 
-    err = open(errfile, 'r')
+    err = open(errfile, 'r', errors='ignore')
 
     for line in err:
         if line.startswith('Stack:'):
