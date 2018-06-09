@@ -133,7 +133,25 @@ def execute_klee(
 
     # use empty list as default flags
     flags = [] if flags is None else flags
+
+    timeout = None
+    time_prefix = "--max-time="
+    # Get the timeout from the passed flags (hacky)
+    for f in flags:
+        if f.startswith(time_prefix):
+            # double the timeout for killing to be safe with time inprecisions
+            timeout = 2 * int(f[len(time_prefix):])
+            break
+
     flags.extend(KLEEFLAGS)
+
+    # set write-interval to the timeout - 2, as we will kill klee when it reaches timeout
+    if timeout is None:
+        flags.append("--stats-write-interval=3600")
+        flags.append("--istats-write-interval=3600")
+    else:
+        flags.append("--stats-write-interval=" + str(timeout - 2))
+        flags.append("--istats-write-interval=" + str(timeout - 2))
 
     # Build the posix flags
     posixflags = [] if posixflags is None else posixflags
@@ -156,7 +174,10 @@ def execute_klee(
     try:
         out = subprocess.check_output(
             command, stderr=subprocess.STDOUT,
-            cwd=tmpdir).decode("utf-8", 'ignore')
+            cwd=tmpdir, timeout=timeout).decode("utf-8", 'ignore')
+    except subprocess.TimeoutExpired as terr:
+        out = terr.output.decode("utf-8", 'ignore')
+        out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
     except subprocess.CalledProcessError as cperr:
         # If something went wrong, we still read the output for analysis
         # We might have to create the outdir though, if klee failed and didn't create it
