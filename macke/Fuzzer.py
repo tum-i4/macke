@@ -340,7 +340,7 @@ class FuzzManager:
         # afl-fuzz sometimes does not cleanup the target correctly, do it here
         try:
             pidstr = subprocess.check_output(["pgrep", "-x", "-f", self.afltarget + " --fuzz-driver=" + functionname]).decode("ascii")
-            pids = pidstr.split('\n')
+            pids = pidstr.split()
             for pid in pids:
                 try:
                     kill(int(pid), signal.SIGKILL)
