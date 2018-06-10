@@ -341,7 +341,11 @@ class FuzzManager:
         try:
             pidstr = subprocess.check_output(["pgrep", "-x", "-f", self.afltarget + " --fuzz-driver=" + functionname]).decode("ascii")
             pids = pidstr.split('\n')
-            kill(int(pids[0]), signal.SIGKILL)
+            for pid in pids:
+                try:
+                    kill(int(pid), signal.SIGKILL)
+                except OSError:
+                    pass
         except subprocess.CalledProcessError as ex:
             pass
 
