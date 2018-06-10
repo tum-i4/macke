@@ -171,6 +171,11 @@ class FuzzResult:
                 if not f.startswith("id:"):
                     continue
                 fname = path.join(d, f)
+
+                # When we miss permissions for file, add permissions
+                if not os.access(fname, os.R_OK):
+                    os.chmod(fname, stat.S_IRUSR)
+
                 if not path.isfile(fname):
                     continue
                 self.testcount += 1
