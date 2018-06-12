@@ -124,26 +124,25 @@ def get_stacktrace(errfile, entryfunction):
     """ Extract the relevant parts of the stack trace from a .err file """
     assert path.isfile(errfile)
 
-    err = open(errfile, 'r', errors='ignore')
+    with open(errfile, 'r', errors='ignore') as err:
+        for line in err:
+            if line.startswith('Stack:'):
+                break
 
-    for line in err:
-        if line.startswith('Stack:'):
-            break
+        stack = []
+        for line in err:
+            if line.startswith('Info:'):
+                break
+            words = line.strip().split(' ')
 
-    stack = []
-    for line in err:
-        if line.startswith('Info:'):
-            break
-        words = line.strip().split(' ')
+            # function name is 3th word
+            fname = words[2]
 
-        # function name is 3th word
-        fname = words[2]
+            # Don't put __macke_error helper functions in stack trace
+            if fname.startswith("__macke_error_"):
+                continue
 
-        # Don't put __macke_error helper functions in stack trace
-        if fname.startswith("__macke_error_"):
-            continue
-
-        # location is last word
-        location = words[-1]
-        stack.append((fname, location))
+            # location is last word
+            location = words[-1]
+            stack.append((fname, location))
     return StackTrace(stack, entryfunction)
