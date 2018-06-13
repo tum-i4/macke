@@ -74,6 +74,14 @@ def main():
         help="Symbolic file argument passed to main function"
     )
 
+
+    parser.add_argument(
+        '--sym-stdin',
+        type=int,
+        metavar="<stdin-size>",
+        help="Use symbolic stdin with size <stdin-size>"
+    )
+
     parser.add_argument(
         '--use-fuzzer',
         type=str2bool,
@@ -161,6 +169,10 @@ def main():
     if args.sym_files:
         posixflags.append("--sym-files")
         posixflags.extend(args.sym_files)
+
+    if args.sym_stdin:
+        posixflags.append("-sym-stdin")
+        posixflags.append(str(args.sym_stdin))
 
     fuzzbc = args.fuzz_bc.name if args.fuzz_bc is not None else None
 
