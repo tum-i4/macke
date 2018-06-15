@@ -122,8 +122,13 @@ def get_coverage(args, inputfile, timeout=1):
     # On hangup terminate the program
     except subprocess.TimeoutExpired:
         p.terminate()
-        p.wait()
-        o, e = p.communicate()
+        try:
+            o, e = p.communicate(timeout=1)
+        # If program does not like to be terminated, kill it.
+        except subprocess.TimeoutExpired:
+            p.kill()
+            # Timeout to get instead throw exception instead of just idling forever
+            o, e = p.communicate(timeout=1)
         output += o
         err += e
     infd.close()

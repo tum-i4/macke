@@ -119,7 +119,7 @@ def extract_fuzzer_coverage(macke_directory):
     while async_results:
         async_results = list(filter(lambda a : not a.ready(), async_results))
         process_queue()
-        time.sleep(0.05)
+        time.sleep(0.2)
     pool.join()
     process_queue()
     os.chdir(old_cwd)
