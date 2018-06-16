@@ -81,8 +81,8 @@ class AsanResult:
 
         # Ignore errors where the argument was freed and gets freed (again) in our driver
         if (self.description.startswith("attempting double-free") and ((len(self.stack) > 2 and
-            self.stack[1][0].startswith("__interceptor_free") and self.stack[2][0].startswith("macke_fuzzer_driver")) or
-            (len(self.stack) > 1 and self.stack[0][0].startswith("__interceptor_free") and self.stack[1][0].startswith("macke_fuzzer_driver")))):
+            self.stack[1][0].startswith("__interceptor_") and self.stack[2][0].startswith("macke_fuzzer_driver")) or
+            (len(self.stack) > 1 and self.stack[0][0].startswith("__interceptor_") and self.stack[1][0].startswith("macke_fuzzer_driver")))):
             self.iserror = False
 
     def convert_to_ktest(self, fuzzmanager, directory, testname, kleeargs = None):
