@@ -7,6 +7,7 @@ import tempfile
 from os import path
 import os
 import subprocess
+import signal
 
 from .config import VALGRIND
 
@@ -111,7 +112,7 @@ def get_coverage(args, inputfile, timeout=1):
     fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
     os.close(fd)
     infd = open(inputfile, "r")
-    p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
     output = b""
     err = b""
     try:
@@ -126,7 +127,7 @@ def get_coverage(args, inputfile, timeout=1):
             o, e = p.communicate(timeout=1)
         # If program does not like to be terminated, kill it.
         except subprocess.TimeoutExpired:
-            p.kill()
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             # Timeout to get instead throw exception instead of just idling forever
             o, e = p.communicate(timeout=1)
         output += o
