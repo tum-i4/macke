@@ -8,6 +8,8 @@ from .Fuzzer import FuzzManager
 
 
 import subprocess
+import traceback
+import sys
 
 # We parse the fuzztime in flags
 def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, fuzztime):
@@ -19,6 +21,8 @@ def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, fuzztim
         print("The analyzed function was:", functionname)
         print(exc)
         print()
+        print(sys.exc_info())
+        traceback.print_tb(sys.exc_info()[2])
 
 
 def thread_phase_one(
@@ -38,6 +42,8 @@ def thread_phase_one(
         print("The analyzed function was:", functionname)
         print(exc)
         print()
+        print(sys.exc_info())
+        traceback.print_tb(sys.exc_info()[2])
 
 
 def thread_phase_two(
@@ -58,3 +64,5 @@ def thread_phase_two(
         print("The analyzed caller/callee pair was:", caller, callee)
         print(exc)
         print()
+        print(sys.exc_info())
+        traceback.print_tb(sys.exc_info()[2])
