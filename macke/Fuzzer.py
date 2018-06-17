@@ -19,7 +19,7 @@ from .constants import FUZZFUNCDIR_PREFIX
 
 from .Asan import AsanResult
 from .Error import Error
-from .callgrind import get_coverage
+from .callgrind import get_coverage, retrieve_lines
 
 
 def _dir_contains_no_files(dirname):
@@ -63,6 +63,8 @@ def extract_fuzzer_coverage(macke_directory):
     afltarget = path.join(builddir, "afl-target")
     if not path.exists(afltarget) or not path.isfile(afltarget):
         return dict()
+
+    program_lines = retrieve_lines(afltarget)
 
     # switch cwd for going through inputs
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_callgrind_")
@@ -115,6 +117,7 @@ def extract_fuzzer_coverage(macke_directory):
                 else:
                     coverage[file] = info
 
+
     coverage = dict()
     while async_results:
         async_results = list(filter(lambda a : not a.ready(), async_results))
@@ -124,6 +127,11 @@ def extract_fuzzer_coverage(macke_directory):
     process_queue()
     os.chdir(old_cwd)
     shutil.rmtree(tmpdir)
+
+    # Mark all existing lines as uncovered so they are not included in the removed statistic
+    for file in coverage:
+        coverage[file]['uncovered'] |= set(program_lines[file])
+
     return coverage
 
 
@@ -270,7 +278,7 @@ class FuzzManager:
         # link general driver
         self.print_func("linking fuzz-target...")
         self.afltarget = path.join(builddir, "afl-target")
-        _run_checked_silent_subprocess([AFLCC] + self.lflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
+        _run_checked_silent_subprocess([AFLCC, "-O3"] + self.lflags + ["-o", self.afltarget, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers])
 
         # link reproducer
         self.print_func("linking reproducer...")
