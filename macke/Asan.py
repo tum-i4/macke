@@ -66,11 +66,11 @@ class AsanResult:
                 words = lines[lno].strip().split(b' ')
 
                 # function name is 4th word
-                fname = words[3].decode("utf-8")
+                fname = words[3].decode("utf-8", 'ignore')
 
                 # location is last word
                 # careful because c++ names containing spaces (Relevant for asan functions)
-                location = words[-1].decode("utf-8")
+                location = words[-1].decode("utf-8", 'ignore')
                 # remove line offset for klee compatibility
                 if has_location.match(location):
                     location = location[:location.rfind(":")]
