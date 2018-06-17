@@ -9,10 +9,13 @@ from .StackTrace import StackTrace
 
 @total_ordering
 class Error:
+    program_functions = []
+
+    def set_program_functions(program_functions):
+        Error.program_functions = program_functions
     """
     Container class for all information about errors found by KLEE
     """
-
     def __init__(self, errfile, entryfunction):
         if '.' in entryfunction:
             entryfunction = entryfunction[:entryfunction.index('.')]
@@ -112,10 +115,42 @@ def get_vulnerable_instruction(errfile):
         # The first line contains the reason - irrelevant for vuln inst
         file.readline()
 
+        # Check whether klee info is existent and use it in case there is no stack trace
         nextline = file.readline().strip()
         if nextline.startswith("File: "):
+            klee_flinfo_exists = True
             filenameline = nextline[len("File: "):]
             linenumline = int(file.readline().strip()[len("line: "):])
+        else:
+            klee_flinfo_exists = False
+
+        for line in file:
+            if line.startswith('Stack:'):
+                break
+
+        for line in file:
+            if line.startswith('Info:'):
+                break
+            words = line.strip().split(' ')
+
+            # function name is 3th word
+            fname = words[2]
+
+            # Don't use external functions as vulnerable instruction
+            if fname not in Error.program_functions:
+                continue
+
+            # Don't put __macke_error as vulnerable instruction
+            if fname.startswith("__macke_error_"):
+                continue
+
+            # location is the last word
+            location = words[-1]
+
+            # The location is already in the format filename:line, thus use it directly
+            return location
+
+        if klee_flinfo_exists:
             return "%s:%s" % (filenameline, linenumline)
     return ""
 
@@ -137,6 +172,10 @@ def get_stacktrace(errfile, entryfunction):
 
             # function name is 3th word
             fname = words[2]
+
+            # Don't put external functions in stack trace
+            if fname not in Error.program_functions:
+                continue
 
             # Don't put __macke_error helper functions in stack trace
             if fname.startswith("__macke_error_"):

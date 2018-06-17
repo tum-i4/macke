@@ -78,6 +78,10 @@ class ErrorRegistry:
     def register_error(self, error):
         """ register an existing error """
 
+        if error.stacktrace.get_depth() == 0:
+            print("Error with empty stack: " + error.errfile)
+            return
+
         if error.errfile.endswith(".macke.err"):
             # Find the prepended error
             # "ERROR FROM /path/test0000001.ptr.err"

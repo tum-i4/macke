@@ -15,21 +15,30 @@ def chains(macke_directory):
     Extract the information about the error chains as an OrderedDict
     """
 
-    registry = get_error_registry_for_mackedir(macke_directory)
     clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    registry = get_error_registry_for_mackedir(macke_directory, clg)
 
     funcs = set(clg.get_flattened_inverted_topology())
 
     errchains = registry.get_chains()
     chainlengths = [c.get_num_user_funcs(funcs) for c in errchains]
 
-    # Count the end phases
+    # Count the end phases and group chains by vulninst
+    detail_dict = dict()
     endphaseone, endphasetwo = 0, 0
     for chain in errchains:
+        vulninst = chain.get_vulnerable_instruction()
+        if vulninst not in detail_dict:
+            detail_dict[vulninst] = []
+        detail_dict[vulninst].append(list(map(lambda x : x[0], chain.filtered_trace(funcs)[::-1])))
         if any(err.errfile.endswith(".macke.err") for err in chain.get_head_errors()):
             endphasetwo += 1
         else:
             endphaseone += 1
+
+    for chains in detail_dict.values():
+        chains.sort(key = lambda x: (-len(x), "@".join(x)))
+
 
     result = OrderedDict([
         ("count", len(chainlengths)),
@@ -42,7 +51,7 @@ def chains(macke_directory):
         ("longerthanone", len([True for c in chainlengths if c > 1])),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),
-        ("detail", list(c.filtered_trace(funcs)[::-1] for c in errchains)),
+        ("detail", detail_dict)
     ])
     return result
     ## LEGACY

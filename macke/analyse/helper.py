@@ -8,6 +8,8 @@ from os import path, listdir
 
 from ..ErrorRegistry import ErrorRegistry
 
+from ..Error import Error
+
 
 def arg_parse_mackedir(description):
     """
@@ -71,10 +73,11 @@ def get_klee_registry_from_mackedir(macke_directory):
     return kinfo
 
 
-def get_error_registry_for_mackedir(macke_directory):
+def get_error_registry_for_mackedir(macke_directory, callgraph):
     """
     Build an error Registry for a MACKE run
     """
+    Error.set_program_functions(callgraph.get_internal_functions())
     macke_directory = path.abspath(macke_directory)
     registry = ErrorRegistry()
     klees = get_klee_registry_from_mackedir(macke_directory)

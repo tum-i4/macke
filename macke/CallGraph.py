@@ -48,6 +48,13 @@ class CallGraph:
                 flattened.extend(topo)
         return flattened
 
+    def get_internal_functions(self):
+        """
+        Returns a list of all internal functions in arbitrary order
+        """
+
+        return [f for f, info in self.graph.items() if not info["isexternal"]]
+
     def list_symbolic_encapsulable(self, removemain=True):
         """
         Returns a sort of inverted topologically ordered list of all function

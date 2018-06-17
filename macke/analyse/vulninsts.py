@@ -13,7 +13,8 @@ def vulninsts(macke_directory):
     """
     Extract informations about the vulnerable instruction as an OrderedDict
     """
-    registry = get_error_registry_for_mackedir(macke_directory)
+    clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    registry = get_error_registry_for_mackedir(macke_directory, clg)
 
     vulninstdict = OrderedDict()
     for vulninst, errors in sorted(
@@ -25,7 +26,6 @@ def vulninsts(macke_directory):
             vulninstdict[vulninst].append(odict)
 
     # Get all library functions
-    clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
     libfuncs = clg.get_functions_with_no_caller()
     libfuncs.discard("main")
 

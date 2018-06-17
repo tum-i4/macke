@@ -19,6 +19,7 @@ from .config import (CONFIGFILE, THREADNUM, get_current_git_hash,
                      get_klee_git_hash, get_llvm_opt_git_hash)
 from .constants import UCLIBC_LIBS, FUZZFUNCDIR_PREFIX
 from .ErrorRegistry import ErrorRegistry
+from .Error import Error
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
 from .threads import thread_phase_one, thread_fuzz_phase_one, thread_phase_two
@@ -230,6 +231,8 @@ class Macke:
 
         # Generate a call graph
         self.callgraph = CallGraph(self.bitcodefile)
+
+        Error.set_program_functions(self.callgraph.get_internal_functions())
 
 
         # Fill a list of functions for the symbolic encapsulation

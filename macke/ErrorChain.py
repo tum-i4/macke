@@ -24,6 +24,9 @@ class ErrorChain:
     def get_head_errors(self):
         return self.head_errors
 
+    def get_vulnerable_instruction(self):
+        return self.head_errors[0].vulnerable_instruction
+
     def error_matches(self, error):
         return error.stacktrace.is_contained_in(self.trace) or self.trace.is_contained_in(error.stacktrace)
 
