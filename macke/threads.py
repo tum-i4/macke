@@ -55,7 +55,7 @@ def thread_phase_two(
     # And run klee on it
     try:
         resultlist.append(execute_klee_targeted_search(
-            prepended_bc, caller, callee, outdir,
+            prepended_bc, caller, "__macke_error_" + callee, outdir,
             flags, posixflags, posix4main))
     # pylint: disable=broad-except
     except Exception as exc:
