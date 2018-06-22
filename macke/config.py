@@ -33,6 +33,7 @@ KLEEBIN = path.expanduser(CONFIG.get("binaries", "klee", fallback="klee"))
 
 # general
 THREADNUM = CONFIG.getint("runtime", "threadnum", fallback=None)
+FUZZMEMLIMIT = CONFIG.getint("runtime", "memlimit", fallback=50)
 
 
 def __get_output_from(*args, **kwargs):

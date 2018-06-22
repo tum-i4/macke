@@ -2,8 +2,10 @@
 Start a complete analysis with the MACKE toolchain on a given bitcode file
 """
 import argparse
+import sys
 
 from .config import check_config
+from .cgroups import initialize_cgroups, validate_cgroups
 from .Macke import Macke
 
 
@@ -14,10 +16,53 @@ def str2bool(v):
         return False
     raise argparse.ArgumentTypeError("Expected boolean value.")
 
+
+def cgroups_command_check():
+    """
+    Parse command lines for cgroups initializer
+    This duplicate parsing is required because bcfile is a 
+    required argument in the other parser and thus initializing would
+    not be possible without supplying it.
+    """
+    parser = argparse.ArgumentParser(
+        description="""\
+        Run modular and compositional analysis with KLEE engine on the given
+        bitcode file. Depending on the program size, this may take a while.
+        """
+    )
+
+    # CGroups arguments
+    parser.add_argument(
+        '--initialize-cgroups',
+        dest='initialize_cgroups',
+        action='store_true',
+        help="Initialize cgroups for fuzzing (might need root access)"
+    )
+    parser.set_defaults(initialize_cgroups=False)
+
+    parser.add_argument(
+        '--cgroups-usergroup',
+        default=None,
+        help="<user>:<group> which owns the cgroup (and will use mackefuzzer)"
+    )
+
+    args, unknown = parser.parse_known_args()
+
+    if args.initialize_cgroups:
+        if args.cgroups_usergroup is None:
+            print("Missing --cgroups-usergroup argument")
+            sys.exit(1)
+        check_config()
+        initialize_cgroups(args.cgroups_usergroup)
+        sys.exit(0)
+
 def main():
     """
     Parse command line arguments, initialize and start a complete MACKE run
     """
+
+    cgroups_command_check()
+
     parser = argparse.ArgumentParser(
         description="""\
         Run modular and compositional analysis with KLEE engine on the given
@@ -146,12 +191,14 @@ def main():
     )
     parser.set_defaults(quiet=False)
 
-
-
-
     check_config()
 
     args = parser.parse_args()
+
+
+    if args.use_fuzzer and not validate_cgroups():
+        print("CGroups are not initialized correctly, please run macke --initialize-cgroups --cgroups-usergroup=<user>:<group>")
+        sys.exit(1)
 
     # Compose KLEE flags given directly by the user
     flags_user = [

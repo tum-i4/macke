@@ -12,9 +12,10 @@ import traceback
 import sys
 
 # We parse the fuzztime in flags
-def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, fuzztime):
+def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, fuzztime):
+    cgroup = cgroupqueue.get()
     try:
-        resultlist.append(fuzzmanager.execute_afl_fuzz(functionname, outdir, fuzztime))
+        resultlist.append(fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime))
     except Exception as exc:
         print()
         print("A fuzz thread in phase one throws an exception")
@@ -23,6 +24,7 @@ def thread_fuzz_phase_one(fuzzmanager, resultlist, functionname, outdir, fuzztim
         print()
         print(sys.exc_info())
         traceback.print_tb(sys.exc_info()[2])
+    cgroupqueue.put(cgroup)
 
 
 def thread_phase_one(

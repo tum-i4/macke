@@ -8,7 +8,7 @@ import time
 import signal
 import shutil
 
-from os import environ, path, makedirs, listdir, kill
+from os import environ, path, makedirs, listdir, kill, killpg, getpgid, setsid
 from multiprocessing import Manager, Pool
 import os
 import stat
@@ -21,18 +21,20 @@ from .Asan import AsanResult
 from .Error import Error
 from .callgrind import get_coverage, retrieve_lines
 
+from .cgroups import cgroups_run_timed_subprocess, cgroups_run_checked_silent_subprocess, cgroups_Popen
+
 
 def _dir_contains_no_files(dirname):
     return not any(path.isfile(f) for f in listdir(dirname))
 
-def _run_checked_silent_subprocess(popenargs):
-    subprocess.check_output(popenargs, stderr=subprocess.STDOUT)
+def _run_checked_silent_subprocess(command, **kwargs):
+    return subprocess.check_output(command, stderr=subprocess.STDOUT, **kwargs)
 
 def _run_subprocess(*args, **kwargs):
     """
     Starts a subprocess, waits for it and returns (exitcode, output, erroutput)
     """
-    p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setsid)
     output = b""
     err = b""
     try:
@@ -40,9 +42,9 @@ def _run_subprocess(*args, **kwargs):
             (o, e) = p.communicate(None, timeout=1)
             output += o
             err += e
-    # On hangup kill the program
+    # On hangup kill the program (and children)
     except subprocess.TimeoutExpired:
-        p.kill()
+        killpg(getpgid(p.pid), signal.SIGKILL)
 
     return p.returncode, output, err
 
@@ -141,8 +143,9 @@ class FuzzResult:
     """
     Container, that stores all information about a afl fuzzing run
     """
-    def __init__(self, fuzzmanager, functionname, errordir, outdir):
+    def __init__(self, fuzzmanager, cgroup, functionname, errordir, outdir):
         self.fuzzmanager = fuzzmanager
+        self.cgroup = cgroup
 
         # duck typing - behave similar to kleeresult
         self.analyzedfunc = functionname
@@ -187,9 +190,9 @@ class FuzzResult:
                 if not path.isfile(fname):
                     continue
                 self.testcount += 1
-                reproduced = self.fuzzmanager.execute_reproducer(fname, self.analyzedfunc)
+                reproduced = self.fuzzmanager.execute_reproducer(self.cgroup, fname, self.analyzedfunc)
                 if reproduced.iserror and reproduced.has_stack_trace():
-                    error = self.fuzzmanager.minimize_crash(fname, reproduced, self.analyzedfunc)
+                    error = self.fuzzmanager.minimize_crash(self.cgroup, fname, reproduced, self.analyzedfunc)
                     self.errorcount += 1
                     self.errfiles.append(fname)
                     asanerrorlist.append(error)
@@ -237,10 +240,14 @@ class FuzzManager:
         environ["AFL_NO_UI"] = "1"
         environ["AFL_QUIET"] = "1"
         environ["AFL_SKIP_CRASHES"] = "1"
+        environ["AFL_TMIN_EXACT"] = "1"
         if(stop_when_done):
             environ["AFL_EXIT_WHEN_DONE"] = "1"
         # Print fatal errors on stderr instead of tty
         environ["LIBC_FATAL_STDERR_"] = "1"
+
+        asan_env = environ.copy()
+        asan_env["AFL_USE_ASAN"] = "1"
 
         ## Save paths temporarily for future compiling
         buffer_extract_source_path = path.join(LIBMACKEFUZZPATH, "helper_funcs", "buffer_extract.c")
@@ -255,7 +262,7 @@ class FuzzManager:
         ## Compile helper functions
         # For afl
         self.print_func("Compiling helper functions for fuzzer...")
-        _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
+        _run_checked_silent_subprocess([CLANG, "-c", "-g"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_afl_instrumented])
         _run_checked_silent_subprocess([AFLCC, "-c", "-g"] + self.cflags + [initializer_source_path, "-o", initializer_afl_instrumented])
         # For reproducer
         _run_checked_silent_subprocess([CLANG, "-c", "-g", "-fsanitize=address"] + self.cflags + [buffer_extract_source_path, "-o", buffer_extract_reproducer])
@@ -285,6 +292,12 @@ class FuzzManager:
         self.reproducer = path.join(builddir, "reproducer")
         _run_checked_silent_subprocess([CLANG, "-v", "-fsanitize=address"] + self.lflags + ["-o", self.reproducer, buffer_extract_reproducer, initializer_reproducer, target_with_drivers_and_asan])
 
+        # link minimizer
+        self.print_func("linking minimizer...")
+        self.minimizer = path.join(builddir, "afl_minimizer")
+        _run_checked_silent_subprocess([AFLCC, "-O3"] + self.lflags + ["-o", self.minimizer, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers], env=asan_env)
+
+
         self.init_inputdirs()
 
 
@@ -294,6 +307,7 @@ class FuzzManager:
 
         if self.smart_input:
             for f in functions:
+                print(f)
                 inputdir = path.join(self.inputbasedir, f)
                 makedirs(inputdir)
                 self.inputforfunc[f] = inputdir
@@ -312,29 +326,29 @@ class FuzzManager:
 
     def list_suitable_drivers(self):
         """ Call the target to list all drivers, strip newline at end and split at newlines """
-        return subprocess.check_output([self.afltarget, "--list-fuzz-drivers"]).decode("utf-8").strip().split('\n')
+        return subprocess.check_output([self.afltarget, "--list-fuzz-drivers"]).decode("utf-8").strip().split()
 
 
     def execute_inputgenerator(self, func, targetdir):
         subprocess.check_output([self.afltarget, "--generate-for=" + func, targetdir, str(self.input_maxlen)])
 
-    def execute_reproducer(self, inputfile, functionname):
+    def execute_reproducer(self, cgroup, inputfile, functionname):
         menv = environ.copy()
         menv["ASAN_OPTIONS"] = "detect_leaks=0"
         infd = open(inputfile, "r")
-        (returncode, stdoutdata, stderrdata) = _run_subprocess(
-            [self.reproducer, "--fuzz-driver=" + functionname], stdin=infd, env=menv)
+        (returncode, stdoutdata, stderrdata) = cgroups_run_timed_subprocess(
+            [self.reproducer, "--fuzz-driver=" + functionname], cgroup=cgroup, stdin=infd, env=menv)
         ret = AsanResult(stderrdata, inputfile, functionname)
         infd.close()
         return ret
 
-    def execute_afl_fuzz(self, functionname, outdir, fuzztime):
+    def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):
         errordir = path.join(outdir, "macke_errors")
         # This creates outdir + error dir
         makedirs(errordir)
 
         outfd = open(path.join(outdir, "output.txt"), "w")
-        proc = subprocess.Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, self.afltarget, "--fuzz-driver=" + functionname], stdout=outfd, stderr=outfd)
+        proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none", self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
 
         time.sleep(fuzztime)
         try:
@@ -357,19 +371,20 @@ class FuzzManager:
         except subprocess.CalledProcessError as ex:
             pass
 
-        return FuzzResult(self, functionname, errordir, outdir);
+        return FuzzResult(self, cgroup, functionname, errordir, outdir);
 
 
-    def execute_afl_tmin(self, inputfile, outputfile, functionname):
-        _run_checked_silent_subprocess([AFLTMIN, "-t", "50", "-i", inputfile, "-o", outputfile, "--", self.afltarget, "--fuzz-driver=" + functionname])
-        return
+    def execute_afl_tmin(self, cgroup, inputfile, outputfile, functionname):
+        asan_env = environ.copy()
+        asan_env["AFL_USE_ASAN"] = "1"
+        return cgroups_run_checked_silent_subprocess([AFLTMIN, "-e", "-t", "50", "-i", inputfile, "-o", outputfile, "-m", "none", "--", self.minimizer, "--fuzz-driver=" + functionname], cgroup, env=asan_env)
 
-    def minimize_crash(self, crashinputfile, asanerror, function):
+    def minimize_crash(self, cgroup, crashinputfile, asanerror, function):
         minimized_name = path.join(path.dirname(crashinputfile), "min_" + path.basename(crashinputfile))
         # tmin fails on timeout - catch this case
         try:
-            self.execute_afl_tmin(crashinputfile, minimized_name, function)
-            asanresult = self.execute_reproducer(minimized_name, function)
+            self.execute_afl_tmin(cgroup, crashinputfile, minimized_name, function)
+            asanresult = self.execute_reproducer(cgroup, minimized_name, function)
             if asanresult.iserror and asanresult.stack == asanerror.stack:
                 return asanresult
         except subprocess.CalledProcessError:
@@ -389,6 +404,7 @@ class FuzzManager:
             kleeargflags.append(kleearg)
 
 
-        _run_checked_silent_subprocess([
+        out = _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
             "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile]);
+        print(out)

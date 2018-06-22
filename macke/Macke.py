@@ -24,6 +24,8 @@ from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
 from .threads import thread_phase_one, thread_fuzz_phase_one, thread_phase_two
 
+from .cgroups import get_cgroups
+
 from .Fuzzer import FuzzManager
 
 # The widgets used by the process bar
@@ -418,9 +420,15 @@ class Macke:
         manager = Manager()
         kleedones = manager.list()
 
+        cgroups_queue = None
+        if self.use_fuzzer and phase == 1:
+            cgroups_queue = manager.Queue()
+            for cgroup in get_cgroups():
+                cgroups_queue.put(cgroup)
+
         # Dispense the KLEE runs on the workers in the pool
         skipped = self.__put_phase_threads_into_pool(
-            phase, pool, run, kleedones)
+            phase, pool, run, kleedones, cgroups_queue)
 
         # close the pool after all KLEE runs are registered
         pool.close()
@@ -441,7 +449,7 @@ class Macke:
 
         return skipped
 
-    def __put_phase_threads_into_pool(self, phase, pool, run, resultlist):
+    def __put_phase_threads_into_pool(self, phase, pool, run, resultlist, cgroups_queue):
         """
         Store a given run for one phase with the required arguments
         into the thread pool
@@ -453,7 +461,7 @@ class Macke:
         if phase == 1:
             for function in run:
                 if self.use_fuzzer:
-                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
+                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, cgroups_queue, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
                 else:
                     pool.apply_async(thread_phase_one, (
                         resultlist, function, self.symmains_bc,
