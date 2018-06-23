@@ -307,7 +307,6 @@ class FuzzManager:
 
         if self.smart_input:
             for f in functions:
-                print(f)
                 inputdir = path.join(self.inputbasedir, f)
                 makedirs(inputdir)
                 self.inputforfunc[f] = inputdir
@@ -407,4 +406,3 @@ class FuzzManager:
         out = _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
             "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile]);
-        print(out)
