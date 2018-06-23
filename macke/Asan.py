@@ -44,6 +44,7 @@ class AsanResult:
         for line in lines:
             # Get the first word after the "Sanitizer:" string on the line that contains "==ERROR:"
             if b"==ERROR:" in line:
+                beginline = lines.index(line)
                 description = line[line.find(b"Sanitizer:")+11:]
                 description.strip()
                 desc_parts = description.split(b' ')
@@ -56,7 +57,7 @@ class AsanResult:
         has_location = re.compile("^.*:[0-9]+:[0-9]+$")
         if self.has_stack_trace():
             # line number and frame-number
-            lno = 0
+            lno = beginline + 1
             fno = 0
 
             while b"#0" not in lines[lno]:
