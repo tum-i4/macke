@@ -6,6 +6,7 @@ Module to contain cgroup abstractions
 from os import path, killpg, getpgid, setsid
 import os
 import subprocess
+import signal
 
 from .config import FUZZMEMLIMIT, THREADNUM
 
