@@ -13,12 +13,20 @@ class Error:
 
     def set_program_functions(program_functions):
         Error.program_functions = program_functions
+
+    def get_function_name(function):
+        if function not in Error.program_functions and '.' in function:
+            # remove everything after the dot
+            tmp = function[:function.index('.')]
+            if tmp in Error.program_functions:
+                return tmp
+        return function
+
     """
     Container class for all information about errors found by KLEE
     """
     def __init__(self, errfile, entryfunction):
-        if '.' in entryfunction:
-            entryfunction = entryfunction[:entryfunction.index('.')]
+        entryfunction = Error.get_function_name(entryfunction)
         # Store the function, that was used as an entry point on the test case
         self.entryfunction = entryfunction
 
@@ -171,9 +179,7 @@ def get_stacktrace(errfile, entryfunction):
             words = line.strip().split(' ')
 
             # function name is 3th word
-            fname = words[2]
-            if '.' in fname:
-                fname = fname[:fname.index('.')]
+            fname = Error.get_function_name(words[2])
 
             # Don't put external functions in stack trace
             if fname not in Error.program_functions:
