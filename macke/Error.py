@@ -172,6 +172,8 @@ def get_stacktrace(errfile, entryfunction):
 
             # function name is 3th word
             fname = words[2]
+            if '.' in fname:
+                fname = fname[:fname.index('.')]
 
             # Don't put external functions in stack trace
             if fname not in Error.program_functions:
