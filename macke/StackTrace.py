@@ -6,12 +6,14 @@ class StackTrace:
         self.entryfunction = entryfunc
 
         self.entryFrame = 0
-        for (fname, _) in stack:
+        self.stack = []
+        for (fname, loc) in stack:
+            if '.' in fname:
+                fname = fname[:fname.index('.')]
+            self.stack.append((fname, loc))
             if fname == entryfunc:
                 break
             self.entryFrame += 1
-
-        self.stack = stack[:self.entryFrame + 1]
 
 
     def __eq__(self, other):
