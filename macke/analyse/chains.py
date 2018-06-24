@@ -21,23 +21,45 @@ def chains(macke_directory):
     funcs = set(clg.get_flattened_inverted_topology())
 
     errchains = registry.get_chains()
-    chainlengths = [c.get_num_user_funcs(funcs) for c in errchains]
 
-    # Count the end phases and group chains by vulninst
+    # Group chains by vulninst
     detail_dict = dict()
-    endphaseone, endphasetwo = 0, 0
     for chain in errchains:
         vulninst = chain.get_vulnerable_instruction()
         if vulninst not in detail_dict:
             detail_dict[vulninst] = []
-        detail_dict[vulninst].append(list(map(lambda x : x[0], chain.filtered_trace(funcs)[::-1])))
-        if any(err.errfile.endswith(".macke.err") for err in chain.get_head_errors()):
-            endphasetwo += 1
-        else:
-            endphaseone += 1
+        fchain = list(map(lambda x : x[0], chain.filtered_trace(funcs)))
+        if fchain not in detail_dict[vulninst]:
+            detail_dict[vulninst].append(fchain)
 
     for chains in detail_dict.values():
         chains.sort(key = lambda x: (-len(x), "@".join(x)))
+
+    chainlengths = [len(chain)
+                    for _, chainlist in detail_dict.items()
+                    for chain in chainlist]
+
+    # Calculate old 1-level-up statistic
+    onelevelup = 0
+    for caller in clg.get_flattened_inverted_topology():
+        for callee in clg[caller]['calls']:
+            onelevelup += len(
+                registry.get_all_vulninst_for_func(caller) &
+                registry.get_all_vulninst_for_func(callee))
+
+
+    # Count phase ends
+    endphaseone, endphasetwo = 0, 0
+    for vulninst, chainlist in detail_dict.items():
+        for chain in chainlist:
+            # candidaterror are all errors, that end this chain
+            # normally, this is just one error, but circles can have several
+            if any(candidaterror.vulnerable_instruction == vulninst and
+                   candidaterror.errfile.endswith(".macke.err")
+                   for candidaterror in registry.forfunction[chain[-1]]):
+                endphasetwo += 1
+            else:
+                endphaseone += 1
 
 
     result = OrderedDict([
@@ -48,6 +70,7 @@ def chains(macke_directory):
             ("avg", mean(chainlengths) if chainlengths else -1),
             ("std", stdev(chainlengths) if len(chainlengths) > 2 else -1),
         ])),
+        ("1-level-up", onelevelup),
         ("longerthanone", len([True for c in chainlengths if c > 1])),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),
