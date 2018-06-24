@@ -189,6 +189,10 @@ def get_stacktrace(errfile, entryfunction):
             if fname.startswith("__macke_error_"):
                 continue
 
+            # Don't continue after driver to rule out possible main false positives due to weird asan errors
+            if fname.startswith("macke_fuzzer_driver"):
+                break
+
             # location is last word
             location = words[-1]
             stack.append((fname, location))
