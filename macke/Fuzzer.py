@@ -319,8 +319,8 @@ class FuzzManager:
     def init_empty_inputdir(self):
         if _dir_contains_no_files(self.inputbasedir):
             dummy_file = path.join(self.inputbasedir, "dummy.input")
-            f = open(dummy_file, "w")
-            f.write("a")
+            f = open(dummy_file, "wb")
+            f.write(b'\0')
             f.close()
 
     def list_suitable_drivers(self):
