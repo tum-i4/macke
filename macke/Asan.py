@@ -76,7 +76,9 @@ class AsanResult:
                 if has_location.match(location):
                     location = location[:location.rfind(":")]
 
-                self.stack.append((fname, location))
+                # Exclude main for fuzzing to prevent false positives and handle bad stacktraces better (HACKY!)
+                if fname != "main":
+                    self.stack.append((fname, location))
                 lno += 1
                 fno += 1
 
