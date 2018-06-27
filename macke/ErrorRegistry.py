@@ -26,6 +26,7 @@ class ErrorRegistry:
 
         self.errorcounter = 0
         self.mackerrorcounter = 0
+        self.fuzzpropagated = 0
 
         self.errorchains = []
 
@@ -93,6 +94,9 @@ class ErrorRegistry:
                 print("error.errfile: " + error.errfile)
                 return
 
+            if testfrom.endswith(".fuzz.err"):
+                self.fuzzpropagated += 1
+
             self.mackerrorcounter += 1
             add_to_listdict(self.mackeforerrfile, testfrom, error)
 
@@ -114,6 +118,13 @@ class ErrorRegistry:
         Count the number of vulnerable instructions stored in the registry
         """
         return len(self.forvulninst)
+
+    def count_fuzz_vulnerable_instructions(self):
+        """
+        Count the number of vulnerable instructions stored in the registry, that were found
+        by at least one .fuzz.err
+        """
+        return len(list(filter(lambda x : len(list(filter(lambda e : e.errfile.endswith(".fuzz.err"), self.forvulninst[x]))) > 0, self.forvulninst)))
 
     def count_functions_with_errors(self):
         """

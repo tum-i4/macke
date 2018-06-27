@@ -284,7 +284,7 @@ class Macke:
                      self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
 
-        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors())
+        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors(), self.errorregistry.count_vulnerable_instructions())
 
     def run_phase_two(self):
         """
@@ -346,12 +346,13 @@ class Macke:
         with open(path.join(self.rundir, "summary.json"), 'w') as file:
             info = OrderedDict()
 
-            p1_chain, p1_errc, p1_errf = self.phase_one_summary
+            p1_chain, p1_errc, p1_errf, p1_vinst_count = self.phase_one_summary
             info["num-functions"] = self.count_functions
             info["phase-one-functions"] = self.count_phase1_functions
             info["phase-one-chains"] = p1_chain
             info["phase-one-error-count"] = p1_errc
             info["phase-one-count-error-funcs"] = p1_errf
+            info["phase-one-vinst-count"] = p1_vinst_count
 
             info["phase-two-runs"] = self.phase2_runs
             info["phase-two-propagated"] = self.propagated
