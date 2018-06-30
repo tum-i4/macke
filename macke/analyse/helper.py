@@ -42,8 +42,14 @@ def store_as_json(macke_directory, filename, content):
         json.dump(content, file)
 
 
-def append_to_registry_from_fuzzdir(registry, fuzzdir):
+def get_fuzz_outdirs(macke_directory):
+    fuzzdir = path.join(macke_directory, "fuzzer")
+    if not path.isdir(path.join(macke_directory, "fuzzer")):
+        return []
+
+    result = []
     prefix = "fuzz_out_"
+
     for f in listdir(fuzzdir):
         if not f.startswith(prefix):
             continue
@@ -51,7 +57,13 @@ def append_to_registry_from_fuzzdir(registry, fuzzdir):
         function = f[len(prefix):]
         if path.islink(fpath) or not path.isdir(fpath):
             continue
+        result.append((function, fpath))
 
+    return result
+
+
+def append_to_registry_from_fuzzdir(registry, macke_directory):
+    for (function, fpath) in get_fuzz_outdirs(macke_directory):
         errordir = path.join(fpath, "macke_errors")
 
         # sanity check
@@ -82,8 +94,7 @@ def get_error_registry_for_mackedir(macke_directory, callgraph):
     registry = ErrorRegistry()
     klees = get_klee_registry_from_mackedir(macke_directory)
 
-    if path.isdir(path.join(macke_directory, "fuzzer")):
-        append_to_registry_from_fuzzdir(registry, path.join(macke_directory, "fuzzer"))
+    append_to_registry_from_fuzzdir(registry, macke_directory)
 
     for _, klee in klees.items():
         if "function" in klee:

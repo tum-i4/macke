@@ -5,6 +5,7 @@ from .chains import main as chains
 from .functions import main as functions
 from .helper import arg_parse_mackedir
 from .kleecrash import main as kleecrash
+from .aflabort import main as aflabort
 from .linecoverage import main as linecoverage
 from .partial import main as partial
 from .runtime import main as runtime
@@ -23,6 +24,7 @@ def main():
     chains()
     functions()
     kleecrash()
+    aflabort()
     linecoverage()
     partial()
     runtime()
