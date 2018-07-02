@@ -40,6 +40,7 @@ def vulninsts(macke_directory):
     result = OrderedDict([
         ("vulninstcount", registry.count_vulnerable_instructions()),
         ("fuzz-vulninstcount", registry.count_fuzz_vulnerable_instructions()),
+        ("fuzz-inst-propagated-count", len(registry.fuzzinstpropagated)),
         ("fuzz-propagated", registry.fuzzpropagated),
         ("bytype", OrderedDict([
             ("main", mainc),

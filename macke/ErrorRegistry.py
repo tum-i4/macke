@@ -27,6 +27,7 @@ class ErrorRegistry:
         self.errorcounter = 0
         self.mackerrorcounter = 0
         self.fuzzpropagated = 0
+        self.fuzzinstpropagated = set()
 
         self.errorchains = []
 
@@ -94,16 +95,19 @@ class ErrorRegistry:
                 print("error.errfile: " + error.errfile)
                 return
 
-            if testfrom.endswith(".fuzz.err"):
-                self.fuzzpropagated += 1
 
             self.mackerrorcounter += 1
             add_to_listdict(self.mackeforerrfile, testfrom, error)
 
             # Propagate information about the vulnerable instruction
             preverr = self.forerrfile[testfrom]
-            error.vulnerable_instruction = str(preverr.vulnerable_instruction)
+            error.vulnerable_instruction = preverr.vulnerable_instruction
             error.stacktrace.prepend(preverr.stacktrace)
+
+
+            if testfrom.endswith(".fuzz.err"):
+                self.fuzzpropagated += 1
+                self.fuzzinstpropagated.add(error.vulnerable_instruction)
 
         add_to_listdict(self.forfunction, error.entryfunction, error)
         self.forerrfile[error.errfile] = error
