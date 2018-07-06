@@ -5,6 +5,7 @@ Module to contain cgroup abstractions
 
 from os import path, killpg, getpgid, setsid
 import os
+import errno
 import subprocess
 import signal
 
@@ -31,22 +32,30 @@ def get_cgroups():
     return ret
 
 
-def initialize_cgroups(usergroup):
+def initialize_cgroups(usergroup, ignore_swap):
     """
     Creates and initiliazes one group for each thread
     """
     num_groups = get_num_threads()
     limitstr = str(FUZZMEMLIMIT) + "M"
+    files = _limitfilenames
 
     for cgrpname in get_cgroups():
-        subprocess.check_call(["cgcreate", "-a", usergroup, "-t", usergroup, "-g", "memory:" + cgrpname])
+        subprocess.check_call(["cgcreate", "-s", "775", "-d", "775", "-f", "775", "-a", usergroup, "-t", usergroup, "-g", "memory:" + cgrpname])
         cpath = path.join("/sys/fs/cgroup/memory", cgrpname)
         for p in _limitfilenames:
             fpath = path.join(cpath, p)
+            if not path.exists(fpath) and path.basename(fpath) == "memory.memsw.limit_in_bytes":
+                if not ignore_swap:
+                    print("Your system does not allow limiting swap memory with cgroups. Either disable swap or continue at your own risk with by adding --ignore-swap to initialization and execution")
+                    return False
+                else:
+                    continue
             with open(fpath, 'w') as f:
                 f.write(limitstr)
+    return True
 
-def validate_cgroups():
+def validate_cgroups(ignore_swap):
     """
     Validate whether cgroups are present and we have access to it
     """
@@ -65,6 +74,12 @@ def validate_cgroups():
             return False
         for p in _limitfilenames:
             fpath = path.join(cpath, p)
+            if not path.exists(fpath) and path.basename(fpath) == "memory.memsw.limit_in_bytes":
+                if not ignore_swap:
+                    print("Your system does not allow limiting swap memory with cgroups. Either disable swap or continue at your own risk with by adding --ignore-swap to initialization and execution")
+                    return False
+                else:
+                    continue
             with open(fpath, 'r') as f:
                 limit = int(f.read())
                 if limit != required_limit:

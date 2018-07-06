@@ -46,6 +46,14 @@ def cgroups_command_check():
         help="<user>:<group> which owns the cgroup (and will use mackefuzzer)"
     )
 
+    parser.add_argument(
+        '--ignore-swap',
+        dest='ignore_swap',
+        action='store_true',
+        help="Ignore missing swap limitations"
+    )
+    parser.set_defaults(ignore_swap=False)
+
     args, unknown = parser.parse_known_args()
 
     if args.initialize_cgroups:
@@ -53,8 +61,10 @@ def cgroups_command_check():
             print("Missing --cgroups-usergroup argument")
             sys.exit(1)
         check_config()
-        initialize_cgroups(args.cgroups_usergroup)
-        sys.exit(0)
+        if initialize_cgroups(args.cgroups_usergroup, args.ignore_swap):
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
 def main():
     """
@@ -191,12 +201,20 @@ def main():
     )
     parser.set_defaults(quiet=False)
 
+    parser.add_argument(
+        '--ignore-swap',
+        dest='ignore_swap',
+        action='store_true',
+        help="Ignore missing swap limitations"
+    )
+    parser.set_defaults(ignore_swap=False)
+
     check_config()
 
     args = parser.parse_args()
 
 
-    if args.use_fuzzer and not validate_cgroups():
+    if args.use_fuzzer and not validate_cgroups(args.ignore_swap):
         print("CGroups are not initialized correctly, please run macke --initialize-cgroups --cgroups-usergroup=<user>:<group>")
         sys.exit(1)
 
