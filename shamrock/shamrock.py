@@ -30,19 +30,17 @@ class Shamrock:
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
+        # Store information from command line
+        self.comment = comment
+        self.flags_user = flags_user if flags_user is not None else []
+        self.posixflags = posixflags if posixflags is not None else []
+        self.posix4main = posix4main if posix4main is not None else []
 
         # add libraries to flags_user
-        self.flags_user = []
         if libraries is not None:
             for l in libraries:
                 if l not in UCLIBC_LIBS:
                     self.flags_user.append("-load=lib"+l+".so")
-
-        # Store information from command line
-        self.comment = comment
-        self.flags_user += flags_user if flags_user is not None else []
-        self.posixflags = posixflags if posixflags is not None else []
-        self.posix4main = posix4main if posix4main is not None else []
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
