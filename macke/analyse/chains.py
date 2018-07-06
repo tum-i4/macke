@@ -35,7 +35,7 @@ def chains(macke_directory):
     for chains in detail_dict.values():
         chains.sort(key = lambda x: (-len(x), "@".join(x)))
 
-    chainlengths = [len(chain)
+    chainlengths = [len(set(chain))
                     for _, chainlist in detail_dict.items()
                     for chain in chainlist]
 
