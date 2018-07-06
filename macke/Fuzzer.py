@@ -19,7 +19,7 @@ from .constants import FUZZFUNCDIR_PREFIX
 
 from .Asan import AsanResult
 from .Error import Error
-from .callgrind import get_coverage, retrieve_lines
+from .callgrind import get_coverage
 
 from .cgroups import cgroups_run_timed_subprocess, cgroups_run_checked_silent_subprocess, cgroups_Popen
 
@@ -65,8 +65,6 @@ def extract_fuzzer_coverage(macke_directory):
     afltarget = path.join(builddir, "afl-target")
     if not path.exists(afltarget) or not path.isfile(afltarget):
         return dict()
-
-    program_lines = retrieve_lines(afltarget)
 
     # switch cwd for going through inputs
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_callgrind_")
@@ -129,10 +127,6 @@ def extract_fuzzer_coverage(macke_directory):
     process_queue()
     os.chdir(old_cwd)
     shutil.rmtree(tmpdir)
-
-    # Mark all existing lines as uncovered so they are not included in the removed statistic
-    for file in coverage:
-        coverage[file]['uncovered'] |= set(program_lines[file])
 
     return coverage
 

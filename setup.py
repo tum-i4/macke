@@ -21,9 +21,6 @@ setup(
             'shamrock = shamrock.__main__:main',
         ]
     },
-    install_requires=[
-        'pyelftools'
-    ],
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
         'Development Status :: 3 - Alpha',

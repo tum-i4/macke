@@ -3,8 +3,6 @@
 Module to run callgrind for a process call and receive line coverage
 """
 
-import elftools.elf.elffile
-
 import tempfile
 from os import path
 import os
@@ -13,71 +11,6 @@ import signal
 
 
 from .config import VALGRIND
-
-
-
-def get_cu_comp_dir(cu):
-    die = cu.get_top_DIE()
-    return die.attributes['DW_AT_comp_dir'].value.decode('ascii')
-
-def retrieve_lines(objfile):
-    fileline = dict()
-    with open(objfile, 'rb') as f:
-        elffile = elftools.elf.elffile.ELFFile(f)
-
-        if not elffile.has_dwarf_info():
-            print("File '" + objfile + "' has no DWARF info")
-
-        dwarfinfo = elffile.get_dwarf_info()
-
-        # Go over all the line programs in the DWARF information
-        for CU in dwarfinfo.iter_CUs():
-            lineprog = dwarfinfo.line_program_for_CU(CU)
-            compdir = get_cu_comp_dir(CU)
-            directories = lineprog['include_directory']
-
-            for entry in lineprog.get_entries():
-                # We're interested in those entries where a new state is assigned
-                if entry.state is None:
-                    continue
-
-                line = entry.state.line
-                # Line 0 means it can not be attributed to any line, thus ignore it
-                if line == 0:
-                    continue
-
-                filenameentry = lineprog['file_entry'][entry.state.file -1]
-                dir_index = filenameentry.dir_index
-                filename = filenameentry.name.decode("ascii")
-
-                directory = None if dir_index == 0 else directories[dir_index - 1].decode('ascii')
-
-                filepath = compdir
-
-                if directory:
-                    filepath = path.join(filepath, directory)
-
-                filepath = path.join(filepath, filename)
-
-
-                if filepath not in fileline:
-                    fileline[filepath] = set()
-                fileline[filepath].add(line)
-
-    # convert sets to lists
-    ret = dict()
-    for file, lines in fileline.items():
-        ret[file] = list(lines)
-    return ret
-
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("No argument given")
-        sys.exit(0)
-    lines = retrieve_lines(sys.argv[1])
-
-    print(json.dumps(lines))
 
 # constants
 POSITION_SPECS = [ "ob", "fl", "fi", "fe", "fn", "cob", "cfi", "cfl", "cfn" ]
