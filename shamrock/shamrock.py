@@ -9,6 +9,7 @@ import sys
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from os import makedirs, path
+from macke.constants import UCLIBC_LIBS
 from macke.config import (CONFIGFILE, get_current_git_hash,
                           get_klee_git_hash, get_llvm_opt_git_hash)
 from macke.Klee import execute_klee
@@ -21,16 +22,25 @@ class Shamrock:
 
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
-                 flags_user=None, posixflags=None, posix4main=None):
+                 flags_user=None, posixflags=None, posix4main=None,
+                 libraries = None):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
+
+        # add libraries to flags_user
+        self.flags_user = []
+        if libraries is not None:
+            for l in libraries:
+                if l not in UCLIBC_LIBS:
+                    self.flags_user.append("-load=lib"+l+".so")
+
         # Store information from command line
         self.comment = comment
-        self.flags_user = flags_user if flags_user is not None else []
+        self.flags_user += flags_user if flags_user is not None else []
         self.posixflags = posixflags if posixflags is not None else []
         self.posix4main = posix4main if posix4main is not None else []
 

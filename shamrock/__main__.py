@@ -66,6 +66,27 @@ def main():
         help="Symbolic file argument passed to main function"
     )
 
+    parser.add_argument(
+        '--sym-stdin',
+        type=int,
+        metavar="<stdin-size>",
+        help="Use symbolic stdin with size <stdin-size>"
+    )
+
+    parser.add_argument(
+        '--libraries',
+        type=lambda s : s.split(','),
+        default=None,
+        help="Libraries that are needed for linking (fuzzing only)"
+    )
+
+    parser.add_argument(
+        '--quiet',
+        dest='quiet',
+        action='store_true'
+    )
+    parser.set_defaults(quiet=False)
+
     check_config()
 
     args = parser.parse_args()
@@ -87,9 +108,13 @@ def main():
         posixflags.append("--sym-files")
         posixflags.extend(args.sym_files)
 
+    if args.sym_stdin:
+        posixflags.append("-sym-stdin")
+        posixflags.append(str(args.sym_stdin))
+
     # And finally pass everything to shamrock
-    shamrock = Shamrock(args.bcfile.name, args.comment, args.parent_dir, False,
-                        flags_user, posixflags, posix4main)
+    shamrock = Shamrock(args.bcfile.name, args.comment, args.parent_dir, args.quiet,
+                        flags_user, posixflags, posix4main, args.libraries)
     shamrock.run_complete_analysis()
 
 
