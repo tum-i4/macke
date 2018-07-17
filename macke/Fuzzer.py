@@ -10,7 +10,7 @@ import shutil
 
 from os import environ, path, makedirs, listdir, kill, killpg, getpgid, setsid
 from multiprocessing import Manager, Pool
-import os
+import os, sys
 import stat
 import tempfile
 
@@ -28,7 +28,12 @@ def _dir_contains_no_files(dirname):
     return not any(path.isfile(f) for f in listdir(dirname))
 
 def _run_checked_silent_subprocess(command, **kwargs):
-    return subprocess.check_output(command, stderr=subprocess.STDOUT, **kwargs)
+    try:
+        p = subprocess.check_output(command, stderr=subprocess.STDOUT, **kwargs)
+        return p
+    except subprocess.CalledProcessError as pexc:
+        print("Error code %d: %s"%(pexc.returncode, pexc.output.decode('utf-8')))
+        sys.exit(pexc.returncode)
 
 def _run_subprocess(*args, **kwargs):
     """

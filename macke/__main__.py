@@ -92,7 +92,6 @@ def main():
         nargs='?',
         default="",
         help="Additional comment, that will be stored in the output directory")
-
     parser.add_argument(
         '--parent-dir',
         nargs='?',
