@@ -10,7 +10,10 @@ import subprocess
 import signal
 
 
-from .config import VALGRIND
+try:
+    from .config import VALGRIND
+except SystemError:
+    from config import VALGRIND
 
 # constants
 POSITION_SPECS = [ "ob", "fl", "fi", "fe", "fn", "cob", "cfi", "cfl", "cfn" ]
@@ -21,11 +24,19 @@ def parse_coverage(cov_file):
     if not content:
         return dict()
 
+    isCreatorCallgrind3 = False
+    for i in range(4):
+        if "creator: callgrind-3" in content[i]:
+            isCreatorCallgrind3 = True
+            break
+
+    assert isCreatorCallgrind3
+    """
     assert ((len(content) >= 3) and
             content[0] == "# callgrind format\n" and
             content[1] == "version: 1\n" and
             content[2].startswith("creator: callgrind-3"))
-
+    """
     i = 3
     while "positions" not in content[i]:
         i += 1
@@ -108,11 +119,16 @@ def parse_coverage(cov_file):
     return extract
 
 
-def get_coverage(args, inputfile, timeout=1):
+def get_coverage(args, inputfile, timeout=1, fileinput=False):
     fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
     os.close(fd)
-    infd = open(inputfile, "r")
+    if not fileinput:
+        infd = open(inputfile, "r")
+    else:
+        infd = None
+        args.append(inputfile)
     p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+    print([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args)
     output = b""
     err = b""
     try:
@@ -132,7 +148,9 @@ def get_coverage(args, inputfile, timeout=1):
             o, e = p.communicate(timeout=1)
         output += o
         err += e
-    infd.close()
+    
+    if not fileinput:
+        infd.close()
 
     with open(tmpfilename, 'r') as tmpfile:
         ret = parse_coverage(tmpfile)
