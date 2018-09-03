@@ -39,11 +39,14 @@ class ErrorRegistry:
 
     def create_from_dir(self, kleedir, entryfunction):
         """ register all errors from directory """
-        assert path.isdir(kleedir)
+        try:
+            assert path.isdir(kleedir)
 
-        for file in listdir(kleedir):
-            if any(file.endswith(ext) for ext in ERRORFILEEXTENSIONS):
-                self.create_entry(path.join(kleedir, file), entryfunction)
+            for file in listdir(kleedir):
+                if any(file.endswith(ext) for ext in ERRORFILEEXTENSIONS):
+                    self.create_entry(path.join(kleedir, file), entryfunction)
+        except AssertionError:
+            print("%s is not a directory"%(kleedir))
 
     def create_entry(self, errfile, entryfunction):
         """ Create a new error and add it to the registry """
