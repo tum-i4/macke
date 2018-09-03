@@ -25,7 +25,10 @@ class CallGraph:
         return pformat(self.graph)
 
     def __getitem__(self, key):
-        return self.graph[key]
+        try:
+            return self.graph[key]
+        except KeyError:
+            return None
 
     def is_symbolic_encapsulable(self, function):
         """
