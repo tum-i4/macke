@@ -119,8 +119,11 @@ def parse_coverage(cov_file):
     return extract
 
 
-def get_coverage(args, inputfile, timeout=1, fileinput=False):
-    fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
+def get_coverage(args, inputfile, timeout=1, fileinput=False, tmpfilename=None):
+    if not tmpfilename==None:
+        fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
+    else:
+        fd = os.open(tmpfilename, "w")
     os.close(fd)
     if not fileinput:
         infd = open(inputfile, "r")
@@ -128,7 +131,6 @@ def get_coverage(args, inputfile, timeout=1, fileinput=False):
         infd = None
         args.append(inputfile)
     p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
-    print([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args)
     output = b""
     err = b""
     try:
