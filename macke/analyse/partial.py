@@ -52,9 +52,10 @@ def partial(macke_directory):
         erroneous, callpairs = set(), set()
         for error in errorlist:
             erroneous.add(error.entryfunction)
-            callpairs.update(
-                {(caller, error.entryfunction)
-                 for caller in clg[error.entryfunction]["calledby"]})
+            if clg[error.entryfunction]:
+                callpairs.update(
+                    {(caller, error.entryfunction)
+                     for caller in clg[error.entryfunction]["calledby"]})
 
         border = {(cler, clee) for (cler, clee) in callpairs
                   if cler not in erroneous}

@@ -54,12 +54,15 @@ def chains(macke_directory):
         for chain in chainlist:
             # candidaterror are all errors, that end this chain
             # normally, this is just one error, but circles can have several
-            if any(candidaterror.vulnerable_instruction == vulninst and
-                   candidaterror.errfile.endswith(".macke.err")
-                   for candidaterror in registry.forfunction[chain[-1]]):
-                endphasetwo += 1
-            else:
-                endphaseone += 1
+            try:
+                if any(candidaterror.vulnerable_instruction == vulninst and
+                       candidaterror.errfile.endswith(".macke.err")
+                       for candidaterror in registry.forfunction[chain[-1]]):
+                    endphasetwo += 1
+                else:
+                    endphaseone += 1
+            except KeyError:
+                print("Exception: %s not in registry for some reason. Skipping."%(chain[-1]))
 
 
     result = OrderedDict([
