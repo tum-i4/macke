@@ -131,6 +131,8 @@ def reconstruct_from_klee_json(kleejson):
     for _, kinfo in sorted(klees.items(), key=operator.itemgetter(0)):
         # Read the KLEE's output
         stdoutput = ""
+        if not path.isfile(path.join(kinfo["folder"], "output.txt")):
+            continue
         with open(path.join(kinfo["folder"], "output.txt"), 'r') as out:
             stdoutput = out.read()
 
