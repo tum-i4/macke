@@ -5,14 +5,28 @@ from collections import OrderedDict
 from functools import total_ordering
 from os import path
 
+from .StackTrace import StackTrace
 
 @total_ordering
 class Error:
+    program_functions = []
+
+    def set_program_functions(program_functions):
+        Error.program_functions = program_functions
+
+    def get_function_name(function):
+        if function not in Error.program_functions and '.' in function:
+            # remove everything after the dot
+            tmp = function[:function.index('.')]
+            if tmp in Error.program_functions:
+                return tmp
+        return function
+
     """
     Container class for all information about errors found by KLEE
     """
-
     def __init__(self, errfile, entryfunction):
+        entryfunction = Error.get_function_name(entryfunction)
         # Store the function, that was used as an entry point on the test case
         self.entryfunction = entryfunction
 
@@ -27,6 +41,9 @@ class Error:
 
         # Store an identifier for the vulnerable instruction "file:line"
         self.vulnerable_instruction = get_vulnerable_instruction(errfile)
+
+        # Store the stack trace for comparison
+        self.stacktrace = get_stacktrace(errfile, entryfunction)
 
     def __eq__(self, other):
         return ((self.entryfunction, self.errfile, self.reason,
@@ -91,7 +108,7 @@ def get_reason_for_error(errfile):
     """ Extract the reason for an error from a .err file """
     assert path.isfile(errfile)
 
-    with open(errfile, "r") as file:
+    with open(errfile, "r", errors='ignore') as file:
         reason = file.readline()
         # The reason starts with "Error: "
         return reason[len("Error: "):].strip()
@@ -102,13 +119,82 @@ def get_vulnerable_instruction(errfile):
     """ Extract the vulnerable instruction "file:line" from a .err file """
     assert path.isfile(errfile)
 
-    with open(errfile, "r") as file:
+    with open(errfile, "r", errors='ignore') as file:
         # The first line contains the reason - irrelevant for vuln inst
         file.readline()
 
+        # Check whether klee info is existent and use it in case there is no stack trace
         nextline = file.readline().strip()
         if nextline.startswith("File: "):
+            klee_flinfo_exists = True
             filenameline = nextline[len("File: "):]
             linenumline = int(file.readline().strip()[len("line: "):])
+        else:
+            klee_flinfo_exists = False
+
+        for line in file:
+            if line.startswith('Stack:'):
+                break
+
+        for line in file:
+            if line.startswith('Info:'):
+                break
+            words = line.strip().split(' ')
+
+            # function name is 3th word
+            fname = words[2]
+
+            # Don't use external functions as vulnerable instruction
+            if fname not in Error.program_functions:
+                continue
+
+            # Don't put __macke_error as vulnerable instruction
+            if fname.startswith("__macke_error_"):
+                continue
+
+            # location is the last word
+            location = words[-1]
+
+            # The location is already in the format filename:line, thus use it directly
+            return location
+
+        if klee_flinfo_exists:
             return "%s:%s" % (filenameline, linenumline)
     return ""
+
+
+def get_stacktrace(errfile, entryfunction):
+    """ Extract the relevant parts of the stack trace from a .err file """
+    assert path.isfile(errfile)
+
+    with open(errfile, 'r', errors='ignore') as err:
+        for line in err:
+            if line.startswith('Stack:'):
+                break
+
+        stack = []
+        for line in err:
+            if line.startswith('Info:'):
+                break
+            words = line.strip().split(' ')
+
+            # function name is 3th word
+            fname = Error.get_function_name(words[2])
+
+            # Don't continue after driver to rule out possible main false positives due to weird asan errors
+            if fname.startswith("macke_fuzzer_driver"):
+                break
+
+            # Don't put external functions in stack trace
+            if fname not in Error.program_functions:
+                continue
+
+            # Don't put __macke_error helper functions in stack trace
+            if fname.startswith("__macke_error_"):
+                continue
+
+
+            # location is last word
+            location = words[-1]
+            stack.append((fname, location))
+    return StackTrace(stack, entryfunction)

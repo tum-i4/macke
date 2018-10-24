@@ -7,23 +7,26 @@ from os import path
 
 from ..llvm_wrapper import extract_lines_of_code
 from ..run_istats import extract_linecoverage
+from ..Fuzzer import extract_fuzzer_coverage
 from .helper import generic_main, get_klee_registry_from_mackedir
-
 
 def linecoverage(macke_directory):
     """
     Extract all linecoverage information in an OrderedDict
     """
 
-    # Read klee.json information
-    klees = get_klee_registry_from_mackedir(macke_directory)
 
     # Extract all lines of code in the unoptimized program
     funcovs = extract_lines_of_code(
         path.join(macke_directory, "bitcode", "program.bc"))
 
+    # Collect fuzzing coverage
+    coverage = extract_fuzzer_coverage(macke_directory)
+
+    # Read klee.json information
+    klees = get_klee_registry_from_mackedir(macke_directory)
+
     # Collect all covered and uncovered lines from all run.istats
-    istats = dict()
     for _, klee in klees.items():
 
         istatsfile = path.join(klee['folder'], "run.istats")
@@ -32,17 +35,17 @@ def linecoverage(macke_directory):
                                    path.basename(klee['folder']), "run.istats")
 
         for file, info in extract_linecoverage(istatsfile).items():
-            if file in istats:
+            if file in coverage:
                 # Merge existing information with the new information
-                istats[file]['covered'] |= info['covered']
-                istats[file]['uncovered'] |= info['uncovered']
+                coverage[file]['covered'] |= info['covered']
+                coverage[file]['uncovered'] |= info['uncovered']
             else:
                 # Add a new entry to the overall stats
-                istats[file] = info
+                coverage[file] = info
 
     # lines only covered on some runs are considered as covered
-    for file in istats:
-        istats[file]['uncovered'] -= istats[file]['covered']
+    for file in coverage:
+        coverage[file]['uncovered'] -= coverage[file]['covered']
 
     # Categorize the per function informations
     perfunction = dict()
@@ -50,15 +53,15 @@ def linecoverage(macke_directory):
         for file, lines in position.items():
             if function not in perfunction:
                 perfunction[function] = dict()
-            istatsforfile = istats.get(file, dict())
+            coverageforfile = coverage.get(file, dict())
             perfunction[function][file] = OrderedDict([
                 ('covered', sorted(list(
-                    set(lines) & istatsforfile.get('covered', set())))),
+                    set(lines) & coverageforfile.get('covered', set())))),
                 ('uncovered', sorted(list(
-                    set(lines) & istatsforfile.get('uncovered', set())))),
+                    set(lines) & coverageforfile.get('uncovered', set())))),
                 ('removed', sorted(list((set(lines) -
-                                         istatsforfile.get('covered', set())) -
-                                        istatsforfile.get('uncovered', set()))
+                                         coverageforfile.get('covered', set())) -
+                                        coverageforfile.get('uncovered', set()))
                                   ))
             ])
 

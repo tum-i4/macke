@@ -25,7 +25,10 @@ class CallGraph:
         return pformat(self.graph)
 
     def __getitem__(self, key):
-        return self.graph[key]
+        try:
+            return self.graph[key]
+        except KeyError:
+            return None
 
     def is_symbolic_encapsulable(self, function):
         """
@@ -47,6 +50,13 @@ class CallGraph:
             else:
                 flattened.extend(topo)
         return flattened
+
+    def get_internal_functions(self):
+        """
+        Returns a list of all internal functions in arbitrary order
+        """
+
+        return [f for f, info in self.graph.items() if not info["isexternal"]]
 
     def list_symbolic_encapsulable(self, removemain=True):
         """
