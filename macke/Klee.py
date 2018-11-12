@@ -146,6 +146,9 @@ def reconstruct_from_klee_json(kleejson):
 
     return result
 
+#TODO: function to check if klee is saturated
+def klee_saturated:
+    pass
 
 def execute_klee(
         bcfile, analyzedfunc, outdir,
@@ -198,6 +201,7 @@ def execute_klee(
         out = _check_output(
             command, cwd=tmpdir,
             timeout=timeout).decode("utf-8", 'ignore')
+    #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
     except subprocess.TimeoutExpired as terr:
         out = terr.output.decode("utf-8", 'ignore')
         out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"

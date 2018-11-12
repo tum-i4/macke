@@ -136,6 +136,8 @@ def main():
         help="Use symbolic stdin with size <stdin-size>"
     )
 
+    #TODO: add argument for flipper mode
+
     parser.add_argument(
         '--use-fuzzer',
         type=str2bool,

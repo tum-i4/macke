@@ -11,10 +11,16 @@ import subprocess
 import traceback
 import sys
 
+#TODO: define thread_flipper_phase_one here
+#TODO: arguments a combination of thread_fuzz_phase_one and thread_phase_one (symbolic) plus flippertime
+def thread_flipper_phase_one:
+    pass
+
 # We parse the fuzztime in flags
 def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, fuzztime):
     cgroup = cgroupqueue.get()
     try:
+        #TODO: copy this call into thread_flipper_phase_one and add saturation check
         resultlist.append(fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime))
     except Exception as exc:
         print()

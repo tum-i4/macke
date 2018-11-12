@@ -344,14 +344,21 @@ class FuzzManager:
         infd.close()
         return ret
 
+    #TODO: Function to check for saturation of AFL (Copy from Jolf)
+    def afl_saturated:
+        pass
+
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):
         errordir = path.join(outdir, "macke_errors")
         # This creates outdir + error dir
         makedirs(errordir)
 
         outfd = open(path.join(outdir, "output.txt"), "w")
+        #TODO: Optional: Run parallel afl_cov to gather coverage stats
+        #TODO: Run saturation check in parallel
         proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none", self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
 
+        #TODO: Depending on flipper or not, either time.sleep or time.sleep till afl_saturates
         time.sleep(fuzztime)
         try:
             kill(proc.pid, signal.SIGINT)

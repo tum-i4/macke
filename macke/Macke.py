@@ -461,6 +461,7 @@ class Macke:
 
         if phase == 1:
             for function in run:
+                #TODO: Add choice of flipper mode here
                 if self.use_fuzzer:
                     pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, cgroups_queue, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
                 else:
