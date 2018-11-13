@@ -75,7 +75,7 @@ We wish you happy testing! If you have problems converting existing source code 
 
 ## Troubleshooting
 
-# Getting around the issue of cgroups
+### Getting around the issue of cgroups
 Linux control groups, or *Cgroups* in short, are a kernel feature that allows user space processes to have limited (and exclusive) access to certain system resources, such as CPU. We leverage cgroups to isolate parallel fuzzing processes so that they don't interfere. 
 
 Therefore, before using Macke, you need to create these cgroups partitions. There are two alternative ways to do this. 
