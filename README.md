@@ -73,6 +73,43 @@ macke --use-fuzzer=1 --fuzz-bc=2beAnalyzedCompiledWithClang3.8.bc 2beAnalyzed.bc
 
 We wish you happy testing! If you have problems converting existing source code bases to bitcode files, you should have a look at this [tool for improving make](https://github.com/tum-i22/MakeAdditions).
 
+## Troubleshooting
+
+# Getting around the issue of cgroups
+Linux control groups, or *Cgroups* in short, are a kernel feature that allows user space processes to have limited (and exclusive) access to certain system resources, such as CPU. We leverage cgroups to isolate parallel fuzzing processes so that they don't interfere. 
+
+Therefore, before using Macke, you need to create these cgroups partitions. There are two alternative ways to do this. 
+
+__Alternative 1: Using Macke__
+
+1. Change as root 
+```
+sudo -s
+```
+
+2. Load macke (with source command) virtual environment and create cgroups
+```
+macke --initialize-cgroups --cgroup-name=<user>:<group>
+```
+
+If the warning about limiting swap memory shows up, then run the following
+```
+macke --initialize-cgroups --cgroup-name=<user>:<group> --ignore-swap
+```
+and in all subsequent macke commands, also add --ignore-swap
+
+__Alternative 2: Manually on command-line__:
+
+1. Run cgroups command. 
+If your CPU has *x* cores, then run the following command *x* times replacing the index *i* with the CPU number, i.e. *mackefuzzer_1*, *mackefuzzer_2*... *mackefuzzer_x*. 
+
+```
+cgcreate -s 775 -d 775 -f 775 -a <usergroup> -t <usergroup> -g memory: mackefuzzer_<i>
+```
+
+You almost certainly might need to run this command as root or with sudo. 
+
+Then, in all subsequent macke commands, also add --ignore-swap, if your operating system does not allow partitioning swap memory resource. 
 
 ## Author's note
 For current issues, suggestions, datasets and gratitude please email [me](mailto:saahil.ognawala@tum.de). 
