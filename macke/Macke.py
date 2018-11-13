@@ -46,7 +46,8 @@ class Macke:
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
-                 exclude_known_from_phase_two=True, use_fuzzer=False, libraries=None,
+                 exclude_known_from_phase_two=True, 
+                 use_flipper=False, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
                  fuzzbc=None, fuzz_input_maxlen=32):
@@ -126,6 +127,9 @@ class Macke:
             self.fuzz_smartinput = generate_smart_fuzz_input
             self.fuzz_stop_when_done = stop_fuzz_when_done
 
+        # Setting the flipper
+        self.use_flipper = use_flipper
+
 
     def save_options(self, to):
         with open(to, 'w') as file:
@@ -134,11 +138,14 @@ class Macke:
             options["exclude_known"] = self.exclude_known_from_phase_two
             options["klee-max-time"] = int(next(filter(lambda f : f.startswith("--max-time="), self.flags_user))[len("--max-time="):])
             options["use_fuzzer"] = self.use_fuzzer
+            options["use_flipper"] = self.use_flipper
             if self.use_fuzzer:
                 options["fuzz-time"] = self.fuzztime
                 options["fuzz-stop-when-done"] = self.fuzz_stop_when_done
                 options["fuzz-smart-input"] = self.fuzz_smartinput
                 options["fuzz-input-maxlen"] = self.fuzz_input_maxlen
+            if self.use_flipper:
+                options["flipper-mode"] = "saturation"
 
             json.dump(options, file)
 

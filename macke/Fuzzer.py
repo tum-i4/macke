@@ -345,7 +345,7 @@ class FuzzManager:
         return ret
 
     #TODO: Function to check for saturation of AFL (Copy from Jolf)
-    def afl_saturated:
+    def afl_saturated():
         pass
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):

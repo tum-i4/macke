@@ -147,8 +147,44 @@ def reconstruct_from_klee_json(kleejson):
     return result
 
 #TODO: function to check if klee is saturated
-def klee_saturated:
-    pass
+def klee_saturated(self, i):
+    if (time.time() - self.start_time) > int(self.max_time_each):
+        self.LOG("KLEE saturated because of timeout.")
+        return True
+    
+    while (not os.path.exists(os.path.join(os.path.join(self.all_output_dir, "klee-"+str(i)), "run.istats"))): # Klee should have at least done something 
+        continue
+    len_old_covered = len(self.klee_progress)
+    
+    ret = False
+    tmp_istats_dir = tempfile.mkdtemp()
+    os.system("cp " + os.path.join(os.path.join(self.all_output_dir, "klee-"+str(i)), "run.istats") + " " + tmp_istats_dir)
+    new_covered = self.parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+    for f in new_covered.keys():
+        for l in new_covered[f].keys():
+            if (f, l) not in self.klee_progress:
+                self.klee_progress.append((f, l))
+                ret = False
+    
+    shutil.rmtree(tmp_istats_dir)
+    
+    if len(self.klee_progress)>len_old_covered:
+        self.LOG("Continuing KLEE. Line coverage increased from %d to %d"%(len_old_covered, len(self.klee_progress)))
+        return False
+    else:
+        self.LOG("KLEE saturated. No new line-coverage found")
+        return True
+
+    """
+    if new_covered:
+        len_new_covered = len([len(new_covered[k].keys()) for k in new_covered.keys()])
+        self.LOG("Continuing KLEE. New line coverage found in %d files"%(len(new_covered.keys())))
+        return False
+
+    self.LOG("KLEE saturated. No new line-coverage found")
+    shutil.rmtree(tmp_istats_dir)
+    return True
+    """
 
 def execute_klee(
         bcfile, analyzedfunc, outdir,
@@ -196,12 +232,12 @@ def execute_klee(
     # Create a new, empty directory
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
 
+    #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
     # actually run KLEE
     try:
         out = _check_output(
             command, cwd=tmpdir,
             timeout=timeout).decode("utf-8", 'ignore')
-    #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
     except subprocess.TimeoutExpired as terr:
         out = terr.output.decode("utf-8", 'ignore')
         out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
