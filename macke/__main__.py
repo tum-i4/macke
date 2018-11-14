@@ -215,6 +215,13 @@ def main():
         help="Ignore missing swap limitations"
     )
     parser.set_defaults(ignore_swap=False)
+    parser.add_argument(
+        '--no-optimize',
+        dest='no_optimize',
+        action='store_true',
+        help="Ask KLEE to not optimize during its runs. (E.g. For Coreutils)"
+    )
+    parser.set_defaults(no_optimize=False)
 
     check_config()
 
@@ -253,7 +260,7 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries, exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen)
+                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries, exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize)
     macke.run_complete_analysis()
 
 if __name__ == "__main__":

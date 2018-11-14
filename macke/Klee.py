@@ -188,7 +188,7 @@ def klee_saturated(self, i):
 
 def execute_klee(
         bcfile, analyzedfunc, outdir,
-        flags=None, posixflags=None, posix4main=None):
+        flags=None, posixflags=None, posix4main=None, no_optimize=False):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
@@ -206,6 +206,8 @@ def execute_klee(
             break
 
     flags.extend(KLEEFLAGS)
+    if no_optimize:
+        flags.remove("--optimize")
 
     # set write-interval to the timeout - 2, as we will kill klee when it reaches timeout
     if timeout is None:
@@ -263,7 +265,7 @@ def execute_klee(
 
 def execute_klee_targeted_search(
         bcfile, analyzedfunc, targetfunc, outdir,
-        flags=None, posixflags=None, posix4main=None):
+        flags=None, posixflags=None, posix4main=None, no_optimize=False):
     """
     Execute KLEE on a bitcode file with sonar search for targetfunc call
     """
@@ -272,4 +274,4 @@ def execute_klee_targeted_search(
     flags = [] if flags is None else flags
     flags = ["--search=sonar", "--sonar-target=function-call", "--sonar-target-info=" + targetfunc] + flags
     return execute_klee(
-        bcfile, analyzedfunc, outdir, flags, posixflags, posix4main)
+        bcfile, analyzedfunc, outdir, flags, posixflags, posix4main, no_optimize)

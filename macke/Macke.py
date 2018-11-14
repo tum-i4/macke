@@ -50,7 +50,7 @@ class Macke:
                  use_flipper=False, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
-                 fuzzbc=None, fuzz_input_maxlen=32):
+                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -129,6 +129,9 @@ class Macke:
 
         # Setting the flipper
         self.use_flipper = use_flipper
+
+        # Should KLEE do extra optimizations?
+        self.no_optimize = no_optimize
 
 
     def save_options(self, to):
@@ -483,7 +486,7 @@ class Macke:
                         self.get_next_klee_directory(
                             dict(phase=phase, bcfile=self.symmains_bc,
                                  function=function)),
-                        self.flags_user, self.posixflags, self.posix4main
+                        self.flags_user, self.posixflags, self.posix4main, self.no_optimize
                     ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
@@ -505,7 +508,7 @@ class Macke:
                         self.get_next_klee_directory(
                             dict(phase=phase, bcfile=prepended_bcfile,
                                  caller=caller, callee=callee)),
-                        self.flags_user, self.posixflags, self.posix4main
+                        self.flags_user, self.posixflags, self.posix4main, self.no_optimize
                     ))
                 else:
                     skipped += 1
