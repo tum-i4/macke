@@ -155,7 +155,7 @@ def main():
         '--fuzz-time',
         type=int,
         default=10,
-        help="Time to fuzz a single function (in minutes)"
+        help="Time to fuzz a single function (in seconds)"
     )
 
     parser.add_argument(

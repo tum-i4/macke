@@ -14,6 +14,7 @@ import sys
 #TODO: define thread_flipper_phase_one here
 #TODO: arguments a combination of thread_fuzz_phase_one and thread_phase_one (symbolic) plus flippertime
 def thread_flipper_phase_one():
+    #TODO: Copy logic from _dispatch_saturation function in Jolf.py 
     pass
 
 # We parse the fuzztime in flags
