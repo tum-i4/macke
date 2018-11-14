@@ -266,6 +266,12 @@ class Macke:
         self.qprint(" done")
 
 
+        #TODO: if self.use_flipper:
+        #          list suitable drivers for fuzzing (F) and symbolic execution (S)
+        #          calculate intersection for F and S
+        #          For the intersection, run in flipper mode
+        #          For F, run in fuzzer mode only
+        #          For F-S, run in symbolic execution mode only
         if self.use_fuzzer:
             tasks = self.fuzz_manager.list_suitable_drivers()
             self.count_phase1_functions = len(tasks)

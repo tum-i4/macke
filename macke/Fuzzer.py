@@ -344,9 +344,41 @@ class FuzzManager:
         infd.close()
         return ret
 
-    #TODO: Function to check for saturation of AFL (Copy from Jolf)
-    def afl_saturated():
-        pass
+    #TODO: Function to check for saturation of AFL (Copy from Jolf, fix to fit)
+    def afl_saturated(self, i):
+        if (time.time() - self.start_time) > int(self.max_time_each):
+            self.LOG("AFL saturated because of timeout.")
+            return True
+        while (not os.path.exists(os.path.join(os.path.join(self.all_output_dir, "fuzzing-"+str(i), "plot_data")))):
+            continue
+        
+        plot_data = open(os.path.join(os.path.join(self.all_output_dir, "fuzzing-"+str(i), "plot_data")))
+        
+        lines = reversed(plot_data.readlines())
+
+        for line in lines:
+            progress = self.parse_plot_data_line(line)
+            if not progress: # Maybe start of the file
+                continue
+            if progress[0] in self.afl_progress.keys(): # We have already read this timestamp
+                break
+            self.afl_progress[progress[0]] = progress[1:]
+
+        zero_since = 0
+        for timestamp in reversed(sorted(self.afl_progress.keys())):
+            if self.afl_progress[timestamp][3]==0 and self.afl_progress[timestamp][4]==0: # pending_total and pending_favs
+                if self.afl_progress[timestamp][0]>0: # If more than one cycle is done then converge to an end faster
+                    zero_since += 2
+                else:
+                    zero_since += 1
+            else:
+                break
+        if zero_since>2: # If no new paths have been seen in the last 3 log items 
+            self.LOG("AFL saturated because zero_since=%d."%(zero_since))
+            return True
+        
+        self.LOG("Continuing AFL. zero_since=%d"%(zero_since))
+        return False
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):
         errordir = path.join(outdir, "macke_errors")

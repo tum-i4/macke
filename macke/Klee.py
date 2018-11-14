@@ -146,7 +146,7 @@ def reconstruct_from_klee_json(kleejson):
 
     return result
 
-#TODO: function to check if klee is saturated
+#TODO: function to check if klee is saturated (Copy from Jolf. Fix to fit)
 def klee_saturated(self, i):
     if (time.time() - self.start_time) > int(self.max_time_each):
         self.LOG("KLEE saturated because of timeout.")
@@ -233,6 +233,7 @@ def execute_klee(
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
 
     #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
+    
     # actually run KLEE
     try:
         out = _check_output(
