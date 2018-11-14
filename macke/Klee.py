@@ -233,6 +233,7 @@ def execute_klee(
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
 
     #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
+    #TODO: With flipper mode add extra arguments to klee. Either "-afl-seed-out-dir=" or "-seed-out-dir" (if AFL->KTest conversion already done)
     
     # actually run KLEE
     try:

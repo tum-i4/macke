@@ -47,7 +47,7 @@ def thread_phase_one(
     # pylint: disable=broad-except
     except Exception as exc:
         print()
-        print("A thread in phase one throws and exception")
+        print("A thread in phase one threw an exception")
         print("The analyzed function was:", functionname)
         print(exc)
         print()
