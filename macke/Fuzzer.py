@@ -23,6 +23,7 @@ from .callgrind import get_coverage
 
 from .cgroups import cgroups_run_timed_subprocess, cgroups_run_checked_silent_subprocess, cgroups_Popen
 
+from .Logger import Logger
 
 def _dir_contains_no_files(dirname):
     return not any(path.isfile(f) for f in listdir(dirname))
@@ -217,7 +218,7 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
+    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print, flipper_mode=False):
         """
         Compile necessary binaries and save the names to them
         """
@@ -270,6 +271,8 @@ class FuzzManager:
         ## Instrument the bcfile
         # Add drivers
         self.print_func("Instrument bc file with fuzzer drivers...")
+        Logger.log(LLVMFUZZOPT + " -load " + LIBMACKEFUZZOPT + " -insert-fuzzdriver" +
+            " -renamemain" + " -mem2reg " + bcfile + " -o " + target_with_drivers)
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-insert-fuzzdriver",
             "-renamemain", "-mem2reg", bcfile, "-o", target_with_drivers])
@@ -296,9 +299,13 @@ class FuzzManager:
         self.minimizer = path.join(builddir, "afl_minimizer")
         _run_checked_silent_subprocess([AFLCC, "-O3"] + self.lflags + ["-o", self.minimizer, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers], env=asan_env)
 
-
         self.init_inputdirs()
 
+        self.flipper_mode = flipper_mode
+
+        # saturation computation
+        self.already_processed_lines = 1
+        self.saturation_index = 0
 
 
     def init_inputdirs(self):
@@ -344,41 +351,76 @@ class FuzzManager:
         infd.close()
         return ret
 
-    #TODO: Function to check for saturation of AFL (Copy from Jolf, fix to fit)
-    def afl_saturated(self, i):
-        if (time.time() - self.start_time) > int(self.max_time_each):
-            self.LOG("AFL saturated because of timeout.")
-            return True
-        while (not os.path.exists(os.path.join(os.path.join(self.all_output_dir, "fuzzing-"+str(i), "plot_data")))):
-            continue
-        
-        plot_data = open(os.path.join(os.path.join(self.all_output_dir, "fuzzing-"+str(i), "plot_data")))
-        
-        lines = reversed(plot_data.readlines())
+    # Function to check for saturation of AFL
+    def afl_saturated(self, outdir: str):
+        if not os.path.exists(os.path.join(os.path.join(outdir, "plot_data"))):
+            Logger.log("afl_saturated - " + outdir + "/plot_data does not exist (yet)\n", verbosity_level="debug")
+            return False
 
-        for line in lines:
-            progress = self.parse_plot_data_line(line)
-            if not progress: # Maybe start of the file
-                continue
-            if progress[0] in self.afl_progress.keys(): # We have already read this timestamp
-                break
-            self.afl_progress[progress[0]] = progress[1:]
+        # saturated means:
+        # 3x timestamps with no pending totals and no pending favs
+        # detected cycles count as 2x such timestamps
 
-        zero_since = 0
-        for timestamp in reversed(sorted(self.afl_progress.keys())):
-            if self.afl_progress[timestamp][3]==0 and self.afl_progress[timestamp][4]==0: # pending_total and pending_favs
-                if self.afl_progress[timestamp][0]>0: # If more than one cycle is done then converge to an end faster
-                    zero_since += 2
-                else:
-                    zero_since += 1
-            else:
-                break
-        if zero_since>2: # If no new paths have been seen in the last 3 log items 
-            self.LOG("AFL saturated because zero_since=%d."%(zero_since))
-            return True
-        
-        self.LOG("Continuing AFL. zero_since=%d"%(zero_since))
-        return False
+        saturated = False
+
+        with open(os.path.join(os.path.join(outdir, "plot_data")), "r") as plot_data:
+            lines = plot_data.readlines()
+
+            if len(lines) <= 1:
+                # the first line is always the header
+                # nothing to analyze yet
+                return False
+
+            number_of_interesting_lines = len(lines) - self.already_processed_lines
+            Logger.log("interesting lines " + str(number_of_interesting_lines) + "/" + str(len(lines)) + "\n", verbosity_level="debug")
+            self.already_processed_lines = number_of_interesting_lines
+
+            # one line is of form:
+            # unix_time, cycles_done, cur_path, paths_total,
+            # pending_total, pending_favs, map_size (float %),
+            # unique_crashes, unique_hangs, max_depth, execs_per_sec (float)
+            for line in lines[len(lines) - number_of_interesting_lines:]:
+                numbers = line.split(", ")
+
+                Logger.log("checking for saturation in line " + str(numbers) + "\n", verbosity_level="debug")
+                # we are interested in cycles_done ([1]), pending_totals ([4]) and pendings_favs ([5])
+                cycles = int(numbers[1])
+                pending_totals = int(numbers[4])
+                pending_favs = int(numbers[5])
+                Logger.log("cycles: " + str(cycles) + " pending_totals: " + str(pending_totals) +
+                           " pending_favs: " + str(pending_favs) + "\n", verbosity_level="debug")
+
+                self.saturation_index = self.saturation_index + (cycles * 2) + pending_favs + pending_totals
+                Logger.log("saturation index is " + str(self.saturation_index) + "\n", verbosity_level="debug")
+
+                if self.saturation_index > 3:
+                    saturated = True
+                    break
+
+        return saturated
+
+    def wait_for_stopping_conditions(self, fuzztime, outdir: str):
+        # Depending on flipper, either time.sleep or time.sleep till afl_saturates
+
+        Logger.log("waiting for stopping conditions for outdir " +
+                   outdir + " and fuzztime " + str(fuzztime) + "\n", verbosity_level="debug")
+
+        if not self.flipper_mode:
+            Logger.log("non flipper mode -> just sleep\n", verbosity_level="debug")
+            time.sleep(fuzztime)
+        else:
+            SATURATION_CHECK_PERIOD = 5 # default afl PLOT_UPDATE_SEC value
+            for i in range(0, int(fuzztime/SATURATION_CHECK_PERIOD)):
+                time.sleep(SATURATION_CHECK_PERIOD)
+                if self.afl_saturated(outdir):
+                    Logger.log("saturation detected\n", verbosity_level="debug")
+                    break
+            # sleep remaining time (if any)
+            time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
+
+            # saturation reached
+            self.already_processed_lines = 1 # first line is text, so not interesting -> initial value 1
+            self.saturation_index = 0
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):
         errordir = path.join(outdir, "macke_errors")
@@ -387,15 +429,19 @@ class FuzzManager:
 
         outfd = open(path.join(outdir, "output.txt"), "w")
         #TODO: Optional: Run parallel afl_cov to gather coverage stats
-        #TODO: Run saturation check in parallel
-        proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none", self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
+        #TODO: see if we can reuse ASAN coverage
+        #TODO: check if we can use -M/-S
+        proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none",
+                              self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
 
-        #TODO: Depending on flipper or not, either time.sleep or time.sleep till afl_saturates
-        time.sleep(fuzztime)
+        # Run saturation check
+        self.wait_for_stopping_conditions(fuzztime, outdir)
+        Logger.log("AFL saturated\n", verbosity_level="debug")
+
         try:
             kill(proc.pid, signal.SIGINT)
             # wait for afl-fuzz to cleanup
-            proc.wait();
+            proc.wait()
         except OSError:
             pass
         outfd.close()
