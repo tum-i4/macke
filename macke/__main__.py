@@ -225,7 +225,7 @@ def main():
     parser.add_argument(
         '--verbosity-level',
         type=str,
-        default="Error",
+        default="info",
         help="The level of verbosity: none, info, warning, error, debug"
     )
     parser.add_argument(
