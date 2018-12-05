@@ -7,7 +7,7 @@ import sys
 from .config import check_config
 from .cgroups import initialize_cgroups, validate_cgroups
 from .Macke import Macke
-
+from .Logger import Logger
 
 def str2bool(v):
     if v.lower() in ("yes", "true", "y", "t", "1"):
@@ -15,7 +15,6 @@ def str2bool(v):
     if v.lower() in ("no", "false", "n", "f", "0"):
         return False
     raise argparse.ArgumentTypeError("Expected boolean value.")
-
 
 def cgroups_command_check():
     """
@@ -223,6 +222,18 @@ def main():
     )
     parser.set_defaults(no_optimize=False)
 
+    parser.add_argument(
+        '--verbosity-level',
+        type=str,
+        default="Error",
+        help="The level of verbosity: none, info, warning, error, debug"
+    )
+    parser.add_argument(
+        '--log-file',
+        type=str,
+        help="Text file name, that will be used for logging, according to the verbosity level"
+    )
+
     check_config()
 
     args = parser.parse_args()
@@ -258,10 +269,14 @@ def main():
 
     fuzzbc = args.fuzz_bc.name if args.fuzz_bc is not None else None
 
+    Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
+
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
                   args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries, exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize)
     macke.run_complete_analysis()
+
+    Logger.close()
 
 if __name__ == "__main__":
     main()
