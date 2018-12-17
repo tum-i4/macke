@@ -9,12 +9,16 @@ import shutil
 import subprocess
 import tempfile
 import signal
+import time
+import os
 
 from collections import OrderedDict
 from os import listdir, path, makedirs, killpg, getpgid, setsid
 
 from .config import KLEEBIN
 from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
+
+from .Logger import Logger
 
 
 # python implementation of timed check_output fails to kill klee correctly
@@ -147,7 +151,7 @@ def reconstruct_from_klee_json(kleejson):
     return result
 
 #TODO: function to check if klee is saturated (Copy from Jolf. Fix to fit)
-def klee_saturated(self, i):
+def klee_saturated(self, start_time, max_time_each, path, klee_progress):
     if (time.time() - self.start_time) > int(self.max_time_each):
         self.LOG("KLEE saturated because of timeout.")
         return True
@@ -236,21 +240,43 @@ def execute_klee(
 
     #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
     #TODO: With flipper mode add extra arguments to klee. Either "-afl-seed-out-dir=" or "-seed-out-dir" (if AFL->KTest conversion already done)
-    
+
+    flipper_mode = False # TODO
+
     # actually run KLEE
-    try:
-        out = _check_output(
-            command, cwd=tmpdir,
-            timeout=timeout).decode("utf-8", 'ignore')
-    except subprocess.TimeoutExpired as terr:
-        out = terr.output.decode("utf-8", 'ignore')
-        out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
-    except subprocess.CalledProcessError as cperr:
-        # If something went wrong, we still read the output for analysis
-        # We might have to create the outdir though, if klee failed and didn't create it
-        if not path.exists(outdir):
-            makedirs(outdir)
-        out = cperr.output.decode("utf-8", 'ignore')
+    if flipper_mode:
+        Logger.log("!!! Running KLEE in flipper mode is not yet implemented", verbosity_level="warning")
+
+        klee_progress = []
+
+        command += " -seed-out-dir" # TODO
+        # start running KLEE with total timeout
+
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, preexec_fn=setsid)
+
+        # check for saturation
+        while not klee_saturated():
+            time.sleep(12) # Takes a lot of time for KLEE to generate anything meaningful
+
+        # klee saturated
+        os.kill(proc.pid, signal.SIGINT)
+        time.sleep(10) # Might take a while for KLEE to be killed properly
+        retcode = proc.poll()
+
+    else:
+        try:
+            out = _check_output(
+                command, cwd=tmpdir,
+                timeout=timeout).decode("utf-8", 'ignore')
+        except subprocess.TimeoutExpired as terr:
+            out = terr.output.decode("utf-8", 'ignore')
+            out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
+        except subprocess.CalledProcessError as cperr:
+            # If something went wrong, we still read the output for analysis
+            # We might have to create the outdir though, if klee failed and didn't create it
+            if not path.exists(outdir):
+                makedirs(outdir)
+            out = cperr.output.decode("utf-8", 'ignore')
 
     # Remove the temporary directory
     shutil.rmtree(tmpdir)

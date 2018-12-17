@@ -28,6 +28,8 @@ from .cgroups import get_cgroups
 
 from .Fuzzer import FuzzManager
 
+from .Logger import Logger
+
 # The widgets used by the process bar
 WIDGETS = [
     widgets.Percentage(),
@@ -42,6 +44,11 @@ class Macke:
     """
     Main container for all steps of the MACKE analysis
     """
+
+    # static "constants"
+    SYM_ONLY = 0
+    FUZZ_ONLY = 1
+    FLIPPER = 2
 
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
@@ -221,15 +228,17 @@ class Macke:
         with open(self.kleejson, 'w') as file:
             file.write("{")
 
-
         # Initialize fuzzing
-        if self.use_fuzzer:
+        if self.use_fuzzer or self.use_flipper:
             # copy the unmodified bitcode file (fuzzer one)
             shutil.copy2(self.fuzzbc, self.fuzz_program_bc)
             builddir = path.join(self.fuzzdir, "build")
             makedirs(builddir)
             self.create_macke_last_symlink()
-            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen, self.qprint)
+
+            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None,
+                                            self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen,
+                                            self.qprint, self.use_flipper)
 
         # Print some information for the user
         self.qprint(
@@ -237,8 +246,18 @@ class Macke:
 
     def run_phase_one(self):
         """
-        Encapsulate all functions symbolically and for each of them
-        start a parallel KLEE run.
+        Normal mode:
+            Encapsulate all functions symbolically and for each of them
+            start a parallel KLEE run.
+        Fuzzer mode:
+            For each function start a parallel AFL run.
+        Flipper mode:
+            For each function that is suitable for both fuzzing and
+            symbolic execution, start a parallel flipper (AFL + KLEE) run.
+            For each function that is only suitable for fuzzing,
+            start a parallel AFL run.
+            For each function that is only suitable for symbolic testing,
+            start a parallel KLEE run.
         """
 
         # Generate a call graph
@@ -246,51 +265,100 @@ class Macke:
 
         Error.set_program_functions(self.callgraph.get_internal_functions())
 
+        total_tasks = [] # tasks to be executed
+        f_tasks = [] # temporary containter for tasks that are only suitable for fuzzing
+        s_tasks = [] # temporary containter for tasks that are only suitable for symbolic testing
 
-        # Fill a list of functions for the symbolic encapsulation
-        tasks = self.callgraph.list_symbolic_encapsulable(
-            removemain=not bool(self.posix4main))
+        # Setup symbolic tasks, if required
+        if (not self.use_fuzzer) or self.use_flipper:
+            # Only care about symbolic testing if we are not in fuzzing mode
+            #   or if we are in flipper mode
 
-        self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
-                    "encapsulation" % (len(tasks), len(self.callgraph.graph)))
+            Logger.log("Setting up symbolic tasks\n", verbosity_level="debug")
 
-        self.count_phase1_functions = len(tasks)
+            # Fill a list of functions for the symbolic encapsulation
+            s_tasks = self.callgraph.list_symbolic_encapsulable(
+                removemain=not bool(self.posix4main))
+
+            self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
+                        "encapsulation" % (len(s_tasks), len(self.callgraph.graph)))
+
+            self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
+
+            # Copy the program bc before encapsulating everything symbolically
+            shutil.copy2(self.program_bc, self.symmains_bc)
+
+            # Generate one bcfile with symbolic encapsulations for each function
+            for functionname in s_tasks:
+                if functionname != "main":
+                    encapsulate_symbolic(self.symmains_bc, functionname)
+            self.qprint(" done")
+            Logger.log("Sym tasks: " + str(s_tasks) + "\n", verbosity_level="debug")
+
+        # Setup fuzzing tasks, if required
+        if self.use_fuzzer or self.use_flipper:
+            # Only care about fuzzing if we are in fuzzing or flipper mode
+
+            Logger.log("Setting up fuzzing tasks\n", verbosity_level="debug")
+
+            f_tasks = self.fuzz_manager.list_suitable_drivers()
+            self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing"
+                         % (len(f_tasks), len(self.callgraph.graph)))
+            Logger.log("Fuzzer tasks: " + str(f_tasks) + "\n", verbosity_level="debug")
+
+        if self.use_flipper:
+            # Calculate intersection between the fuzzing tasks and the sym. testing tasks
+            # For the intersection, run in flipper mode
+            # For the fuzzing tasks - intersection, run in fuzzer mode only
+            # For the symbolic tasks - intersection, run in symbolic execution mode only
+
+            Logger.log("Setting up flipper tasks\n", verbosity_level="debug")
+
+            # compute interesection
+            f_s_tasks = list( set(s_tasks).intersection(f_tasks) )
+            f_tasks = list( set(f_tasks).difference(f_s_tasks) )
+            s_tasks = list( set(s_tasks).difference(f_s_tasks) )
+
+            Logger.log("Flipper tasks: " + str(f_s_tasks) + "\n", verbosity_level="debug")
+            Logger.log("Fuzzer only tasks: " + str(f_tasks) + "\n", verbosity_level="debug")
+            Logger.log("Sym only tasks: " + str(s_tasks) + "\n", verbosity_level="debug")
+
+            self.qprint("Phase 1 - with fuzzing only: %d of %d functions"
+                        % (len(f_tasks), len(self.callgraph.graph)))
+
+            self.qprint("        - with symbolic execution only: %d of %d functions"
+                        % (len(s_tasks), len(self.callgraph.graph)))
+
+            self.qprint("        - with both fuzzing and symbolic execution (flipper mode): %d of %d functions"
+                        % (len(f_s_tasks), len(self.callgraph.graph)))
+
+        if self.use_flipper:
+            self.qprint("Phase 1: Performing flipper runs ...")
+
+            # add type data to the tasks
+            f_s_tasks = [(task, self.FLIPPER) for task in f_s_tasks]
+            f_tasks = [(task, self.FUZZ_ONLY) for task in s_tasks]
+            s_tasks = [(task, self.SYM_ONLY) for task in s_tasks]
+
+            total_tasks = f_s_tasks + f_tasks + s_tasks
+        else:
+            if self.use_fuzzer:
+                self.qprint("Phase 1: Performing afl-fuzz runs ...")
+                total_tasks = f_tasks
+            else:
+                self.qprint("Phase 1: Performing KLEE runs ...")
+                total_tasks = s_tasks
+
+
+        self.count_phase1_functions = len(total_tasks)
         self.count_functions = len(self.callgraph.graph)
 
-        self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
-
-        # Copy the program bc before encapsulating everything symbolically
-        shutil.copy2(self.program_bc, self.symmains_bc)
-
-        # Generate one bcfile with symbolic encapsulations for each function
-        for functionname in tasks:
-            if functionname != "main":
-                encapsulate_symbolic(self.symmains_bc, functionname)
-        self.qprint(" done")
-
-
-        #TODO: if self.use_flipper:
-        #          list suitable drivers for fuzzing (F) and symbolic execution (S)
-        #          calculate intersection for F and S
-        #          For the intersection, run in flipper mode
-        #          For F, run in fuzzer mode only
-        #          For F-S, run in symbolic execution mode only
-        if self.use_fuzzer:
-            tasks = self.fuzz_manager.list_suitable_drivers()
-            self.count_phase1_functions = len(tasks)
-            self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
-                         % (len(tasks), len(self.callgraph.graph)))
-
-        if self.use_fuzzer:
-            self.qprint("Phase 1: Performing afl-fuzz runs ...")
-        else:
-            self.qprint("Phase 1: Performing KLEE runs ...")
 
         pbar = ProgressBar(
-            widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
+            widgets=WIDGETS, max_value=len(total_tasks)) if not self.quiet else None
 
         self.starttimephase1 = datetime.now()
-        self.__execute_in_parallel_threads(tasks, 1, pbar)
+        self.__execute_in_parallel_threads(total_tasks, 1, pbar)
 
         if not self.quiet:
             pbar.finish()
@@ -429,6 +497,8 @@ class Macke:
         if not self.quiet:
             # Store the state of the progressbar before running anything
             donebefore = pbar.value if pbar is not None else 0
+        else:
+            donebefore = 0
 
         # Create a pool with a fixed number of parallel processes
         # Either use the configured number of thread or one for each cpu thread
@@ -476,18 +546,51 @@ class Macke:
         skipped = 0
 
         if phase == 1:
-            for function in run:
-                #TODO: Add choice of flipper mode here
+            if self.use_flipper:
+                for (function, type) in run:
+                    if type is self.FUZZ_ONLY:
+                        Logger.log(str(function) + " -- fuzz_only\n", verbosity_level="debug")
+                        pool.apply_async(thread_fuzz_phase_one,
+                                         (self.fuzz_manager, cgroups_queue, resultlist, function,
+                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
+                                          self.fuzztime))
+                    else:
+                        if type is self.SYM_ONLY:
+                            Logger.log(str(function) + " -- symolic testing_only\n", verbosity_level="debug")
+                            pool.apply_async(thread_phase_one, (
+                                resultlist, function, self.symmains_bc,
+                                self.get_next_klee_directory(
+                                    dict(phase=phase, bcfile=self.symmains_bc,
+                                         function=function)),
+                                self.flags_user, self.posixflags, self.posix4main, self.no_optimize
+                            ))
+                        else:
+                            # flipper
+                            Logger.log("!!! Running Macke in flipper mode is not yet implemented",
+                                       verbosity_level="warning")
+
+                            Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
+                            pool.apply_async(thread_fuzz_phase_one,
+                                             (self.fuzz_manager, cgroups_queue, resultlist, function,
+                                              path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
+                                              self.fuzztime))
+            else:
                 if self.use_fuzzer:
-                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, cgroups_queue, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
+                    for (function, _) in run:
+                        pool.apply_async(thread_fuzz_phase_one,
+                                         (self.fuzz_manager, cgroups_queue, resultlist, function,
+                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
+                                          self.fuzztime))
                 else:
-                    pool.apply_async(thread_phase_one, (
-                        resultlist, function, self.symmains_bc,
-                        self.get_next_klee_directory(
-                            dict(phase=phase, bcfile=self.symmains_bc,
-                                 function=function)),
-                        self.flags_user, self.posixflags, self.posix4main, self.no_optimize
-                    ))
+                    # symbolic execution only
+                    for (function, _) in run:
+                        pool.apply_async(thread_phase_one, (
+                            resultlist, function, self.symmains_bc,
+                            self.get_next_klee_directory(
+                                dict(phase=phase, bcfile=self.symmains_bc,
+                                     function=function)),
+                            self.flags_user, self.posixflags, self.posix4main, self.no_optimize
+                        ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
             for (caller, callee) in run:
