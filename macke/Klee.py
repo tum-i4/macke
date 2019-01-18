@@ -46,13 +46,14 @@ class KleeResult:
     Container, that store all information about a klee run
     """
 
-    def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None):
+    def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None, progress=0):
         # Set all atttributes given by the constructor
         self.bcfile = bcfile
         self.analyzedfunc = analyzedfunc
         self.outdir = outdir
         self.flags = [] if flags is None else flags
         self.stdoutput = stdoutput
+        self.progress = progress
 
         # Calculate some statistics
         match = re.search(
@@ -213,6 +214,7 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
         else:
             Logger.log("KLEE saturated. No new line-coverage found\n", verbosity_level="info")
             saturated = True
+    return len(klee_progress)
 
 def execute_klee(
         bcfile, analyzedfunc, outdir, flipper_mode,
@@ -281,7 +283,7 @@ def execute_klee(
         if timeout > 12:
             time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
             # check for saturation
-            wait_for_klee_saturation(start_time, timeout, outdir, klee_progress)
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress)
         else:
             # low timeout, no point in checking saturation
             time.sleep(timeout)
@@ -314,7 +316,7 @@ def execute_klee(
         file.write(out)
 
     # Return a filled result container
-    return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
+    return KleeResult(bcfile, analyzedfunc, outdir, out, flags, progress)
 
 
 def execute_klee_targeted_search(
