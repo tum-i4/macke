@@ -150,48 +150,72 @@ def reconstruct_from_klee_json(kleejson):
 
     return result
 
-#TODO: function to check if klee is saturated (Copy from Jolf. Fix to fit)
-def klee_saturated(self, start_time, max_time_each, path, klee_progress):
-    if (time.time() - self.start_time) > int(self.max_time_each):
-        self.LOG("KLEE saturated because of timeout.")
-        return True
-    
-    while (not os.path.exists(os.path.join(os.path.join(self.all_output_dir, "klee-"+str(i)), "run.istats"))): # Klee should have at least done something 
-        continue
-    len_old_covered = len(self.klee_progress)
-    
-    ret = False
-    tmp_istats_dir = tempfile.mkdtemp()
-    os.system("cp " + os.path.join(os.path.join(self.all_output_dir, "klee-"+str(i)), "run.istats") + " " + tmp_istats_dir)
-    new_covered = self.parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
-    for f in new_covered.keys():
-        for l in new_covered[f].keys():
-            if (f, l) not in self.klee_progress:
-                self.klee_progress.append((f, l))
-                ret = False
-    
-    shutil.rmtree(tmp_istats_dir)
-    
-    if len(self.klee_progress)>len_old_covered:
-        self.LOG("Continuing KLEE. Line coverage increased from %d to %d"%(len_old_covered, len(self.klee_progress)))
-        return False
-    else:
-        self.LOG("KLEE saturated. No new line-coverage found")
-        return True
+def parse_run_istats(istats_file):
+    istats = open(istats_file)
 
-    """
-    if new_covered:
-        len_new_covered = len([len(new_covered[k].keys()) for k in new_covered.keys()])
-        self.LOG("Continuing KLEE. New line coverage found in %d files"%(len(new_covered.keys())))
-        return False
+    covered = {}
 
-    self.LOG("KLEE saturated. No new line-coverage found")
-    shutil.rmtree(tmp_istats_dir)
-    return True
-    """
+    cur_file = None
+
+    for line in istats:
+        if line.startswith("fl="):
+            cur_file = line.split("=")[1].strip()
+            continue
+
+        tokens = line.split()
+        if len(tokens) != 15:
+            continue
+        src, cov = int(tokens[1]), int(tokens[2])  # Read source-level coverage rather than LLVM level
+
+        if (cov > 0):
+            if cur_file not in covered.keys():  # The covered file is newly covered
+                covered[cur_file] = {}
+            covered[cur_file][src] = cov
+    return covered
+
+def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
+    saturated = False
+    while not saturated:
+        if (time.time() - start_time) > int(max_time_each):
+            Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
+            saturated = True
+            continue
+
+        if (int(max_time_each) + start_time - time.time()) > 12:
+            # we can sleep an entire period and recheck the output
+            time.sleep(12)
+        else:
+            # sleep what time is left and do a last check
+            time.sleep(int(max_time_each) + start_time - time.time() - 1)
+
+        if not os.path.exists(os.path.join(path, "run.istats")):
+            Logger.log("Path " + os.path.join(path, "run.istats") + " does not exits (yet)\n", verbosity_level="debug")
+            time.sleep()
+            continue
+
+        len_old_covered = len(klee_progress)
+
+        progress_done = False
+        tmp_istats_dir = tempfile.mkdtemp()
+        os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
+        new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+        for f in new_covered.keys():
+            for l in new_covered[f].keys():
+                if (f, l) not in klee_progress:
+                    klee_progress.append((f, l))
+                    progress_done = True
+
+        shutil.rmtree(tmp_istats_dir)
+
+        if progress_done:
+            Logger.log("Continuing KLEE. Line coverage increased from " + str(len_old_covered) + " to " +
+                       str(len(klee_progress)) + "\n", verbosity_level="info")
+        else:
+            Logger.log("KLEE saturated. No new line-coverage found\n", verbosity_level="info")
+            saturated = True
 
 def execute_klee(
-        bcfile, analyzedfunc, outdir,
+        bcfile, analyzedfunc, outdir, flipper_mode,
         flags=None, posixflags=None, posix4main=None, no_optimize=False):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
@@ -217,6 +241,7 @@ def execute_klee(
     if timeout is None:
         flags.append("--stats-write-interval=3600")
         flags.append("--istats-write-interval=3600")
+        timeout = 3600
     else:
         flags.append("--stats-write-interval=" + str(timeout - 2))
         flags.append("--istats-write-interval=" + str(timeout - 2))
@@ -238,31 +263,34 @@ def execute_klee(
     # Create a new, empty directory
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
 
-    #TODO: modify below: When in flipper mode then keep going till klee_saturated. Otherwise apply below
-    #TODO: With flipper mode add extra arguments to klee. Either "-afl-seed-out-dir=" or "-seed-out-dir" (if AFL->KTest conversion already done)
+    Logger.log("KLEE command: " + str(command) + "\n", verbosity_level="debug")
 
-    flipper_mode = False # TODO
+    out = ""
 
     # actually run KLEE
     if flipper_mode:
-        Logger.log("!!! Running KLEE in flipper mode is not yet implemented", verbosity_level="warning")
-
         klee_progress = []
 
-        command += " -seed-out-dir" # TODO
+        # AFL->KTest conversion already done
+        command += " -seed-out-dir"
         # start running KLEE with total timeout
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, preexec_fn=setsid)
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=tmpdir, preexec_fn=setsid)
 
-        # check for saturation
-        while not klee_saturated():
-            time.sleep(12) # Takes a lot of time for KLEE to generate anything meaningful
+        start_time = time.time()
+        if timeout > 12:
+            time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
+            # check for saturation
+            wait_for_klee_saturation(start_time, timeout, outdir, klee_progress)
+        else:
+            # low timeout, no point in checking saturation
+            time.sleep(timeout)
 
         # klee saturated
-        os.kill(proc.pid, signal.SIGINT)
+        # maybe use kill 9 (see below)  os.kill(proc.pid, signal.SIGINT)
+        # TODO adapt this
         time.sleep(10) # Might take a while for KLEE to be killed properly
         retcode = proc.poll()
-
     else:
         try:
             out = _check_output(
