@@ -22,7 +22,7 @@ from .ErrorRegistry import ErrorRegistry
 from .Error import Error
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
-from .threads import thread_phase_one, thread_fuzz_phase_one, thread_flipper_phase_one, thread_phase_two, test_phase
+from .threads import thread_phase_one, thread_fuzz_phase_one, thread_flipper_phase_one, thread_phase_two
 
 from .cgroups import get_cgroups
 
@@ -569,11 +569,8 @@ class Macke:
                             ))
                     else:
                         # flipper
-                        #Logger.log("!!! Running Macke in flipper mode is not yet implemented",
-                        #           verbosity_level="warning")
 
                         Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
-                        #pool.apply_async(test_phase)
                         pool.apply_async(thread_flipper_phase_one, (
                                           self.fuzz_manager, cgroups_queue, resultlist, function,
                                           path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),

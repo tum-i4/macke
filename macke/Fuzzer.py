@@ -155,6 +155,13 @@ class FuzzResult:
         inputcorpus = path.join(outdir, "queue")
         crashcorpus = path.join(outdir, "crashes")
 
+        inputdirectories = [inputcorpus, crashcorpus]
+        self.progress = 0
+        for d in inputdirectories:
+            for f in listdir(d):
+                if f.startswith("id:"):
+                    self.progress += 1
+
         self.find_errors(inputcorpus, crashcorpus)
 
 
@@ -385,6 +392,7 @@ class FuzzManager:
                 cycles = int(numbers[1])
                 pending_totals = int(numbers[4])
                 pending_favs = int(numbers[5])
+
                 Logger.log("cycles: " + str(cycles) + " pending_totals: " + str(pending_totals) +
                            " pending_favs: " + str(pending_favs) + "\n", verbosity_level="debug")
 
@@ -424,20 +432,36 @@ class FuzzManager:
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool):
         errordir = path.join(outdir, "macke_errors")
-        # This creates outdir + error dir
-        makedirs(errordir)
+        resume = False
+        # This creates outdir + error dir, if not already existing
+        if not os.path.exists(errordir):
+            makedirs(errordir)
+        else:
+            Logger.log(errordir + " already exists. Flipper iteration?\n", verbosity_level="debug")
+            resume = True
+
 
         outfd = open(path.join(outdir, "output.txt"), "w")
         #TODO: Optional: Run parallel afl_cov to gather coverage stats
         #TODO: see if we can reuse ASAN coverage
         #TODO: check if we can use -M/-S
 
+        proc = None
+        if resume:
+            proc = cgroups_Popen([AFLFUZZ, "-i-", "-o", outdir, "-m", "none",
+                                  self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd,
+                                 stderr=outfd)
+            Logger.log("fuzzing command " + AFLFUZZ + " -i- -o " + outdir + " -m " + " none " +
+                              self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
+        else:
+            proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none",
+                                  self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd,
+                                 stderr=outfd)
+            Logger.log("fuzzing command " + AFLFUZZ + " -i " + self.inputforfunc[functionname] + " -o " + outdir + " -m " + " none " +
+                              self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
+
         Logger.log("fuzzing " + functionname + "\n", verbosity_level="debug")
         Logger.log("outdir " + outdir + "\n", verbosity_level="debug")
-        Logger.log("fuzzing command " + AFLFUZZ + " -i " + self.inputforfunc[functionname] + " -o " + outdir + " -m " + " none " +
-                              self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
-        proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none",
-                              self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
 
         # Run saturation check
         self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode)
