@@ -22,7 +22,7 @@ from .ErrorRegistry import ErrorRegistry
 from .Error import Error
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
-from .threads import thread_phase_one, thread_fuzz_phase_one, thread_phase_two
+from .threads import thread_phase_one, thread_fuzz_phase_one, thread_flipper_phase_one, thread_phase_two, test_phase
 
 from .cgroups import get_cgroups
 
@@ -140,6 +140,8 @@ class Macke:
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
 
+        self.count_phase1_functions = 0
+
 
     def save_options(self, to):
         with open(to, 'w') as file:
@@ -238,7 +240,7 @@ class Macke:
 
             self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None,
                                             self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen,
-                                            self.qprint, self.use_flipper)
+                                            self.qprint)
 
         # Print some information for the user
         self.qprint(
@@ -266,8 +268,8 @@ class Macke:
         Error.set_program_functions(self.callgraph.get_internal_functions())
 
         total_tasks = [] # tasks to be executed
-        f_tasks = [] # temporary containter for tasks that are only suitable for fuzzing
-        s_tasks = [] # temporary containter for tasks that are only suitable for symbolic testing
+        f_tasks = [] # temporary container for tasks that are only suitable for fuzzing
+        s_tasks = [] # temporary container for tasks that are only suitable for symbolic testing
 
         # Setup symbolic tasks, if required
         if (not self.use_fuzzer) or self.use_flipper:
@@ -332,16 +334,15 @@ class Macke:
             self.qprint("        - with both fuzzing and symbolic execution (flipper mode): %d of %d functions"
                         % (len(f_s_tasks), len(self.callgraph.graph)))
 
-        if self.use_flipper:
             self.qprint("Phase 1: Performing flipper runs ...")
 
             # add type data to the tasks
             f_s_tasks = [(task, self.FLIPPER) for task in f_s_tasks]
-            f_tasks = [(task, self.FUZZ_ONLY) for task in s_tasks]
+            f_tasks = [(task, self.FUZZ_ONLY) for task in f_tasks]
             s_tasks = [(task, self.SYM_ONLY) for task in s_tasks]
 
             total_tasks = f_s_tasks + f_tasks + s_tasks
-        else:
+        else: # not flipper
             if self.use_fuzzer:
                 self.qprint("Phase 1: Performing afl-fuzz runs ...")
                 total_tasks = f_tasks
@@ -368,7 +369,9 @@ class Macke:
                      self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
 
-        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors(), self.errorregistry.count_vulnerable_instructions())
+        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter,
+                                  self.errorregistry.count_functions_with_errors(),
+                                  self.errorregistry.count_vulnerable_instructions())
 
     def run_phase_two(self):
         """
@@ -549,47 +552,56 @@ class Macke:
             if self.use_flipper:
                 for (function, type) in run:
                     if type is self.FUZZ_ONLY:
-                        Logger.log(str(function) + " -- fuzz_only\n", verbosity_level="debug")
+                        Logger.log("fuzzing path: " + self.fuzzdir + FUZZFUNCDIR_PREFIX + function + "\n", verbosity_level="debug")
+
+                        Logger.log(str(function) + " -- fuzz only\n", verbosity_level="debug")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
                                           path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
-                                          self.fuzztime))
-                    else:
-                        if type is self.SYM_ONLY:
-                            Logger.log(str(function) + " -- symolic testing_only\n", verbosity_level="debug")
-                            pool.apply_async(thread_phase_one, (
-                                resultlist, function, self.symmains_bc,
-                                self.get_next_klee_directory(
-                                    dict(phase=phase, bcfile=self.symmains_bc,
-                                         function=function)),
-                                self.flags_user, self.posixflags, self.posix4main, self.no_optimize
+                                          self.fuzztime, False)
+                                         )
+                    elif type is self.SYM_ONLY:
+                        Logger.log(str(function) + " -- symbolic testing only\n", verbosity_level="debug")
+                        pool.apply_async(thread_phase_one, (
+                            resultlist, function, self.symmains_bc, self.get_next_klee_directory(
+                                dict(phase=phase, bcfile=self.symmains_bc,function=function)),
+                            self.flags_user, self.posixflags, self.posix4main, self.no_optimize, False
                             ))
-                        else:
-                            # flipper
-                            Logger.log("!!! Running Macke in flipper mode is not yet implemented",
-                                       verbosity_level="warning")
+                    else:
+                        # flipper
+                        #Logger.log("!!! Running Macke in flipper mode is not yet implemented",
+                        #           verbosity_level="warning")
 
-                            Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
-                            pool.apply_async(thread_fuzz_phase_one,
-                                             (self.fuzz_manager, cgroups_queue, resultlist, function,
-                                              path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
-                                              self.fuzztime))
+                        Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
+                        #pool.apply_async(test_phase)
+                        pool.apply_async(thread_flipper_phase_one, (
+                                          self.fuzz_manager, cgroups_queue, resultlist, function,
+                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
+                                          self.fuzztime, self.symmains_bc, self.get_next_klee_directory(
+                                           dict(phase=phase, bcfile=self.symmains_bc,
+                                                function=function)),
+                                          self.flags_user, self.posixflags, self.posix4main, self.no_optimize,
+                                          True)
+                                         )
+
             else:
                 if self.use_fuzzer:
-                    for (function, _) in run:
+                    for function in run:
+                        Logger.log("fuzzing path: " + self.fuzzdir + FUZZFUNCDIR_PREFIX + function + "\n", verbosity_level="debug")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
                                           path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
-                                          self.fuzztime))
+                                          self.fuzztime, False))
                 else:
                     # symbolic execution only
-                    for (function, _) in run:
+                    for function in run:
                         pool.apply_async(thread_phase_one, (
                             resultlist, function, self.symmains_bc,
                             self.get_next_klee_directory(
                                 dict(phase=phase, bcfile=self.symmains_bc,
                                      function=function)),
-                            self.flags_user, self.posixflags, self.posix4main, self.no_optimize
+                            self.flags_user, self.posixflags, self.posix4main, self.no_optimize,
+                            False
                         ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
