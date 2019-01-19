@@ -143,6 +143,13 @@ def main():
     )
 
     parser.add_argument(
+        '--flipper_timeout',
+        type=int,
+        default=30,
+        help="Timeout (s) for the experimental fuzzing feature"
+    )
+
+    parser.add_argument(
         '--use-fuzzer',
         type=str2bool,
         default=False,

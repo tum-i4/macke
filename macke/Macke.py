@@ -54,7 +54,7 @@ class Macke:
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
                  exclude_known_from_phase_two=True, 
-                 use_flipper=False, use_fuzzer=False, libraries=None,
+                 use_flipper=False, flipper_timeout=30, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
                  fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False):
@@ -136,6 +136,7 @@ class Macke:
 
         # Setting the flipper
         self.use_flipper = use_flipper
+        self.flipper_timeout = flipper_timeout
 
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
@@ -577,10 +578,9 @@ class Macke:
                                           self.fuzztime, self.symmains_bc, self.get_next_klee_directory(
                                            dict(phase=phase, bcfile=self.symmains_bc,
                                                 function=function)),
-                                          self.flags_user, self.posixflags, self.posix4main, self.no_optimize,
-                                          True)
+                                          self.flags_user, self.posixflags, self.posix4main, self.flipper_timeout,
+                                          self.no_optimize, True)
                                          )
-
             else:
                 if self.use_fuzzer:
                     for function in run:
