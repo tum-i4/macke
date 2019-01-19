@@ -139,14 +139,32 @@ def extract_fuzzer_coverage(macke_directory):
 def compute_fuzz_progress(outdir: str):
     inputcorpus = path.join(outdir, "queue")
     crashcorpus = path.join(outdir, "crashes")
+    hangcorpus = path.join(outdir, "hangs")
 
-    inputdirectories = [inputcorpus, crashcorpus]
+    inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
     progress = 0
+    processed = []
     for d in inputdirectories:
         for f in listdir(d):
-            if f.startswith("id:"):
+            if f.endswith(".ktest"):
+                Logger.log("compute_fuzz_process: added " + f + "\n", verbosity_level="debug")
                 progress += 1
-    Logger.log("compute_fuzz_progress on "+ outdir + ": " + str(progress) + "\n", verbosity_level="debug")
+            else:
+                if f.startswith("id:"):
+                    to_process = f
+                elif f.startswith("min_id:"):
+                    to_process = f[3:] # strip the "min"
+                else:
+                    continue
+
+                if not (to_process in processed):
+                    #Logger.log("compute_fuzz_process: added " + f + "\n", verbosity_level="debug")
+                    processed.append(to_process)
+                    progress += 1
+                else:
+                    Logger.log("compute_fuzz_process: skipping " + f + "\n", verbosity_level="debug")
+
+    #Logger.log("compute_fuzz_progress on " + outdir + ": " + str(progress) + "\n", verbosity_level="debug")
     return progress
 
 class FuzzResult:
@@ -176,6 +194,49 @@ class FuzzResult:
 
         self.find_errors(inputcorpus, crashcorpus)
 
+
+    def convert_to_klee_files(self, fuzzmanager, kleeargs = None):
+        Logger.log("convert_to_klee_files: processing " + self.outdir + "\n", verbosity_level="debug")
+
+        inputcorpus = path.join(self.fuzzoutdir, "queue")
+        crashcorpus = path.join(self.fuzzoutdir, "crashes")
+        hangcorpus = path.join(self.fuzzoutdir, "hangs")
+
+        inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
+
+        processed = []
+        for d in inputdirectories:
+            for f in listdir(d):
+                #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
+                if f.startswith("id:"):
+                    to_process = f
+                elif f.startswith("min_id:"):
+                    to_process = f[3:] # strip the "min"
+                else:
+                    continue
+                #Logger.log("convert_to_klee_files: check if " + to_process + " is in " + str(processed) + "\n", verbosity_level="debug")
+
+                if not (to_process in processed):
+                    processed.append(to_process)
+                    Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
+                    """
+                    Creates a file <testname>.ktest and <testname>.ktest.err in directory
+                    Returns the name of the errfile
+                    """
+                    errname = "fuzzer%0.5d" % len(to_process)
+                    ktestname = path.join(self.outdir, errname + ".ktest")
+
+                    if os.path.exists(ktestname):
+                        Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
+                        continue
+
+                    if kleeargs is None:
+                        kleeargs = []
+
+                    # Generate .ktest file
+                    fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+                else:
+                    Logger.log("convert_to_klee_files: skipping " + f + "\n", verbosity_level="debug")
 
     def find_errors(self, inputcorpus, crashcorpus):
         """
@@ -541,6 +602,8 @@ class FuzzManager:
             kleeargflags.append("-kleeargs")
             kleeargflags.append(kleearg)
 
+        Logger.log("run_ktest_converter: creating " + outfile + " from " + inputfile + "\n",
+                   verbosity_level="debug")
 
         out = _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
