@@ -227,7 +227,7 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
 
 def execute_klee(
         bcfile, analyzedfunc, outdir, flipper_mode,
-        flags=None, posixflags=None, posix4main=None, no_optimize=False):
+        flags=None, posixflags=None, posix4main=None, no_optimize=False, afl_to_klee_dir=""):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
@@ -282,7 +282,7 @@ def execute_klee(
     # actually run KLEE
     if flipper_mode:
         # AFL->KTest conversion already done
-        command += " -seed-out-dir"
+        command += " -seed-out-dir=" + afl_to_klee_dir
         # start running KLEE with total timeout
 
         # init klee progress
