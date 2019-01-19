@@ -15,11 +15,14 @@ import glob
 import time
 
 # We parse the fuzztime in flags
-def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, fuzztime, flipper_mode):
+def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, afl_to_klee_dir, fuzztime,
+                          flipper_mode):
     Logger.log("thread_fuzz_phase_one: " + functionname + "\n", verbosity_level="debug")
     cgroup = cgroupqueue.get()
     try:
-        resultlist.append(fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode))
+        result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
+        resultlist.append(result)
+        result.convert_erros_to_klee_files(["queue", "crashes"])
     except Exception as exc:
         print()
         print("A fuzz thread in phase one throws an exception")
@@ -29,11 +32,12 @@ def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, ou
         print(sys.exc_info())
         traceback.print_tb(sys.exc_info()[2])
     cgroupqueue.put(cgroup)
+
     Logger.log("done thread_fuzz_phase_one: " + functionname + "\n", verbosity_level="debug")
 
 # Arguments a combination of thread_fuzz_phase_one and thread_phase_one (symbolic) plus flippertime
 # We parse the fuzztime in flags
-def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, fuzztime,
+def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, afl_to_klee_dir, fuzztime,
                              symmains_bc, klee_outdir, flags, posixflags, posix4main, timeout, no_optimize=False,
                              flipper_mode=True
                              ):
@@ -44,6 +48,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
     result = None
 
     timeout_timestamp = time.time() + timeout
+    #afl_to_klee_dir = path.join(outdir, "afl_to_klee_dir") # macke_errors
 
     while progress_done and (time.time() < timeout_timestamp):
         # TODO: in case of no progress, keep going until at least some progress is done?
@@ -54,7 +59,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
 
         try:
             result = execute_klee(
-                symmains_bc, functionname, klee_outdir, flipper_mode, flags, posixflags, posix4main, no_optimize)
+                symmains_bc, functionname, klee_outdir, flipper_mode, flags, posixflags, posix4main, no_optimize,
+                afl_to_klee_dir)
         # pylint: disable=broad-except
         except Exception as exc:
             print()
@@ -89,7 +95,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
 
         cgroup = cgroupqueue.get()
         try:
-            result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode)
+            result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
         except Exception as exc:
             print()
             print("A fuzz thread in phase one throws an exception")
@@ -109,8 +115,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             else:
                 Logger.log("AFL has not made progress\n", verbosity_level="debug")
 
-
     resultlist.append(result)
+    result.convert_erros_to_klee_files(["queue", "crashes"])
 
     Logger.log("done thread_flipper_phase_one: " + functionname + "\n", verbosity_level="debug")
 
