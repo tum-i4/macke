@@ -136,14 +136,24 @@ def extract_fuzzer_coverage(macke_directory):
 
     return coverage
 
+def compute_fuzz_progress(outdir: str):
+    inputcorpus = path.join(outdir, "queue")
+    crashcorpus = path.join(outdir, "crashes")
 
-
+    inputdirectories = [inputcorpus, crashcorpus]
+    progress = 0
+    for d in inputdirectories:
+        for f in listdir(d):
+            if f.startswith("id:"):
+                progress += 1
+    Logger.log("compute_fuzz_progress on "+ outdir + ": " + str(progress) + "\n", verbosity_level="debug")
+    return progress
 
 class FuzzResult:
     """
     Container, that stores all information about a afl fuzzing run
     """
-    def __init__(self, fuzzmanager, cgroup, functionname, errordir, outdir):
+    def __init__(self, fuzzmanager, cgroup, functionname, errordir, outdir, old_progress):
         self.fuzzmanager = fuzzmanager
         self.cgroup = cgroup
 
@@ -155,12 +165,14 @@ class FuzzResult:
         inputcorpus = path.join(outdir, "queue")
         crashcorpus = path.join(outdir, "crashes")
 
-        inputdirectories = [inputcorpus, crashcorpus]
-        self.progress = 0
-        for d in inputdirectories:
-            for f in listdir(d):
-                if f.startswith("id:"):
-                    self.progress += 1
+        new_progress = compute_fuzz_progress(outdir)
+
+        if new_progress >= old_progress:
+            self.progress = new_progress - old_progress
+        else:
+            Logger.log("FuzzResult: new_progress (" + str(new_progress) + ") < than old_progress (" +
+                       str(old_progress) + ")\n", verbosity_level="warning")
+            self.progress = 0
 
         self.find_errors(inputcorpus, crashcorpus)
 
@@ -405,7 +417,7 @@ class FuzzManager:
 
         return saturated
 
-    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool):
+    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool):
         # Depending on flipper, either time.sleep or time.sleep till afl_saturates
 
         Logger.log("waiting for stopping conditions for outdir " +
@@ -415,7 +427,8 @@ class FuzzManager:
             Logger.log("non flipper mode -> just sleep\n", verbosity_level="debug")
             time.sleep(fuzztime)
             Logger.log("checking if " + os.path.join(os.path.join(outdir, "plot_data")) + " exists: " +
-                       str(os.path.exists(os.path.join(os.path.join(outdir, "plot_data")))) + "\n", verbosity_level="debug")
+                       str(os.path.exists(os.path.join(os.path.join(outdir, "plot_data")))) + "\n",
+                       verbosity_level="debug")
         else:
             SATURATION_CHECK_PERIOD = 5 # default afl PLOT_UPDATE_SEC value
             for i in range(0, int(fuzztime/SATURATION_CHECK_PERIOD)):
@@ -427,7 +440,14 @@ class FuzzManager:
             time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
 
             # saturation reached
-            self.already_processed_lines = 1 # first line is text, so not interesting -> initial value 1
+            if not resume:
+                self.already_processed_lines = 1 # first line is text, so not interesting -> initial value 1
+            else:
+                with open(os.path.join(os.path.join(outdir, "plot_data")), "r") as plot_data:
+                    lines = plot_data.readlines()
+                    self.already_processed_lines = len(lines)
+                    Logger.log("resuming fuzzer with already_processed_lines = " + str(self.already_processed_lines)
+                               + "\n", verbosity_level="debug")
             self.saturation_index = 0
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool):
@@ -436,8 +456,11 @@ class FuzzManager:
         # This creates outdir + error dir, if not already existing
         if not os.path.exists(errordir):
             makedirs(errordir)
+            old_progress = 0
         else:
             Logger.log(errordir + " already exists. Flipper iteration?\n", verbosity_level="debug")
+            old_progress = compute_fuzz_progress(outdir)
+            Logger.log("old_progress: " + str(old_progress) + "\n", verbosity_level="debug")
             resume = True
 
 
@@ -446,7 +469,6 @@ class FuzzManager:
         #TODO: see if we can reuse ASAN coverage
         #TODO: check if we can use -M/-S
 
-        proc = None
         if resume:
             proc = cgroups_Popen([AFLFUZZ, "-i-", "-o", outdir, "-m", "none",
                                   self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd,
@@ -464,7 +486,7 @@ class FuzzManager:
         Logger.log("outdir " + outdir + "\n", verbosity_level="debug")
 
         # Run saturation check
-        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode)
+        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume)
         Logger.log("AFL saturated\n", verbosity_level="debug")
 
         try:
@@ -487,7 +509,7 @@ class FuzzManager:
         except subprocess.CalledProcessError as ex:
             pass
 
-        return FuzzResult(self, cgroup, functionname, errordir, outdir);
+        return FuzzResult(self, cgroup, functionname, errordir, outdir, old_progress);
 
 
     def execute_afl_tmin(self, cgroup, inputfile, outputfile, functionname):
