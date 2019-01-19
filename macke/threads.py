@@ -4,7 +4,7 @@ All functions, that are executed in parallel threads
 
 from .Klee import execute_klee, execute_klee_targeted_search
 
-from .Fuzzer import FuzzManager
+from .Fuzzer import FuzzManager, FuzzResult
 from .Logger import Logger
 from .read_klee_testcases import process_klee_out
 
@@ -75,7 +75,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                 Logger.log("klee_outdir: " + klee_outdir + "\n", verbosity_level="debug")
                 #for k in glob.glob(klee_outdir + "/klee-*"):
                 #    argv.extend(process_klee_out(k, fuzzmanager.inputbasedir + "/input"))
-                argv.extend(process_klee_out(klee_outdir, fuzzmanager.inputbasedir))
+                argv.extend(process_klee_out(klee_outdir, fuzzmanager.inputforfunc[functionname]))
 
                 # argv = self.clean_argv(argv)
                 Logger.log("argv: " + str(argv) + "\n", verbosity_level="debug")
@@ -103,11 +103,12 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
         if result:
             if result.progress:
                 progress_done = True
+                # transform fuzz files to klee files
+                result.convert_to_klee_files(fuzzmanager)
                 Logger.log("AFL has made progress (" + str(result.progress) + ")\n", verbosity_level="info")
             else:
                 Logger.log("AFL has not made progress\n", verbosity_level="debug")
 
-        # fuzz files are already translated to klee files
 
     resultlist.append(result)
 
