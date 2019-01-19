@@ -1,6 +1,7 @@
 import sys, os
 import glob
 import struct 
+import traceback
 
 from .config import KLEEBIN
 from .Logger import Logger
@@ -167,6 +168,10 @@ def get_object_type(o):
         return "model"
     elif name_line.startswith("stdout"):
         return "stdout"
+    elif name_line.startswith("argno"):
+        return "argno"
+    elif name_line.startswith("macke_sizeof_argno"):
+        return "macke_sizeof_argno"
 
     return name_line
 
@@ -237,12 +242,21 @@ def write_files_to_file(testname, objects, out_folder):
         testcase.close()
 
 def write_args_to_file(testname, objects, out_folder):
+    Logger.log("write_args_to_file: " + str(testname) + " " + str(objects) + " " + str(out_folder) + "\n", verbosity_level="debug")
+    '''
     if not os.path.isdir("%s/args" % (out_folder)):
         os.system("mkdir %s/args" % (out_folder))
     testcase = open("%s/args/%s.txt" % (out_folder, testname), "w")
+    '''
+    if not os.path.isdir(out_folder):
+        os.system("mkdir %s" % (out_folder))
+    testcase = open("%s/%s.txt" % (out_folder, testname), "w")
+
+    Logger.log("write_args_to_file: opened " + out_folder + "/" + testname + ".txt\n", verbosity_level="debug")
     arg_string = ""
     for o in objects:
-        arg_string += o[2] + " "
+        arg_string += o + "\xFA" #o[2] + " "
+    #Logger.log("write_args_to_file: " + str(arg_string) + "\n", verbosity_level="debug")
     if arg_string != "":
         arg_string += "\n"
         testcase.write(arg_string)
@@ -276,15 +290,29 @@ def write_testcase_file(testname, objects, out_folder):
             name, size, data = get_full_model_version(o)
         elif type == "stdout":
             pass
+        elif type == "argno":
+            Logger.log("write_testcase_file: argno\n", verbosity_level="debug")
+            name, size, data = get_full_arg(o)
+            Logger.log("write_testcase_file: " + str(data) + "\n", verbosity_level="debug")
+            if data != '':
+                command_args_objects.append(data)
+        elif type == "macke_sizeof_argno":
+            pass
         else:
             print(testname)
             print("Invalid type '%s' read. Ending in panic" % (type))
+            traceback.print_stack()
             sys.exit(-1)
+
+    Logger.log("write_testcase_file: command_args_objects " + str(command_args_objects) + "\n", verbosity_level="debug")
 
     if not os.path.isdir(out_folder):
         os.system("mkdir %s" % (out_folder))
-    #write_args_to_file(testname, command_args_objects, out_folder)
+    if len(command_args_objects):
+        write_args_to_file(testname, command_args_objects, out_folder) # test manu
+    Logger.log("write_args_to_file done\n", verbosity_level="debug")
     write_files_to_file(testname, file_objects, out_folder)
+    Logger.log("write_files_to_file done\n", verbosity_level="debug")
     #write_stdin_to_file(testname, stdin_objects, out_folder)
     ret = ""
     for arg in command_args_objects:
@@ -324,6 +352,7 @@ def process_klee_out(klee_out_name, out_folder):
         meta, objects = process_file(t)
         testcase_basename = os.path.basename(t).split(".")[0]
         ret = write_testcase_file(testcase_basename, objects, out_folder)
+        Logger.log("process_klee_out: wrote testcase file\n", verbosity_level="debug")
         if ret:
             argv.append(ret)
         TESTCASE_I += 1
