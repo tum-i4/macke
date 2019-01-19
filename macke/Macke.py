@@ -30,6 +30,8 @@ from .Fuzzer import FuzzManager
 
 from .Logger import Logger
 
+from .analyse.linecoverage import linecoverage
+
 # The widgets used by the process bar
 WIDGETS = [
     widgets.Percentage(),
@@ -463,6 +465,8 @@ class Macke:
 
             json.dump(info, file)
 
+        Logger.log("line coverage: " + linecoverage(self.rundir) + "\n", verbosity_level="info")
+
         self.create_macke_last_symlink()
 
     def create_macke_last_symlink(self):
@@ -556,9 +560,11 @@ class Macke:
                         Logger.log("fuzzing path: " + self.fuzzdir + FUZZFUNCDIR_PREFIX + function + "\n", verbosity_level="debug")
 
                         Logger.log(str(function) + " -- fuzz only\n", verbosity_level="debug")
+                        afl_outdir = path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function)
+                        afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
+                                          afl_outdir, afl_to_klee_dir,
                                           self.fuzztime, False)
                                          )
                     elif type is self.SYM_ONLY:
@@ -572,10 +578,12 @@ class Macke:
                         # flipper
 
                         Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
+                        afl_outdir = path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function)
+                        afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_flipper_phase_one, (
                                           self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
-                                          self.fuzztime, self.symmains_bc, self.get_next_klee_directory(
+                                          afl_outdir, afl_to_klee_dir, self.fuzztime, self.symmains_bc,
+                                          self.get_next_klee_directory(
                                            dict(phase=phase, bcfile=self.symmains_bc,
                                                 function=function)),
                                           self.flags_user, self.posixflags, self.posix4main, self.flipper_timeout,
@@ -585,10 +593,11 @@ class Macke:
                 if self.use_fuzzer:
                     for function in run:
                         Logger.log("fuzzing path: " + self.fuzzdir + FUZZFUNCDIR_PREFIX + function + "\n", verbosity_level="debug")
+                        afl_outdir = path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function)
+                        afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function),
-                                          self.fuzztime, False))
+                                          afl_outdir, afl_to_klee_dir, self.fuzztime, False))
                 else:
                     # symbolic execution only
                     for function in run:
