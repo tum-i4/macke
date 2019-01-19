@@ -309,9 +309,6 @@ def execute_klee(
             time.sleep(timeout)
 
         # klee saturated
-        # maybe use kill 9 (see below)  os.kill(proc.pid, signal.SIGINT)
-        # TODO adapt this
-        #time.sleep(10) # Might take a while for KLEE to be killed properly
         killpg(getpgid(proc.pid), signal.SIGKILL)
         retcode = proc.poll()
     else:
