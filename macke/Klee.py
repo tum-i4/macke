@@ -174,8 +174,25 @@ def parse_run_istats(istats_file):
             covered[cur_file][src] = cov
     return covered
 
+def compute_klee_progress(path: str):
+    progress_done = False
+    tmp_istats_dir = tempfile.mkdtemp()
+    os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
+    new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+    klee_progress = []
+    for f in new_covered.keys():
+        for l in new_covered[f].keys():
+            if (f, l) not in klee_progress:
+                klee_progress.append((f, l))
+                #progress_done = True
+
+    shutil.rmtree(tmp_istats_dir)
+    return klee_progress#(klee_progress, progress_done)
+
 def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
     saturated = False
+    #progress_done = False
+
     while not saturated:
         if (time.time() - start_time) > int(max_time_each):
             Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
@@ -187,33 +204,25 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
             time.sleep(12)
         else:
             # sleep what time is left and do a last check
-            time.sleep(int(max_time_each) + start_time - time.time() - 1)
+            time.sleep(int(max_time_each) + start_time - time.time())
 
         if not os.path.exists(os.path.join(path, "run.istats")):
             Logger.log("Path " + os.path.join(path, "run.istats") + " does not exits (yet)\n", verbosity_level="debug")
-            time.sleep()
             continue
 
         len_old_covered = len(klee_progress)
 
-        progress_done = False
-        tmp_istats_dir = tempfile.mkdtemp()
-        os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
-        new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
-        for f in new_covered.keys():
-            for l in new_covered[f].keys():
-                if (f, l) not in klee_progress:
-                    klee_progress.append((f, l))
-                    progress_done = True
+        klee_progress = compute_klee_progress(path)
+        Logger.log("compute_klee_progress: size of progress is " + str(len(klee_progress)) + "\n",
+                   verbosity_level="debug")
 
-        shutil.rmtree(tmp_istats_dir)
-
-        if progress_done:
+        if len_old_covered < len(klee_progress):
             Logger.log("Continuing KLEE. Line coverage increased from " + str(len_old_covered) + " to " +
                        str(len(klee_progress)) + "\n", verbosity_level="info")
         else:
             Logger.log("KLEE saturated. No new line-coverage found\n", verbosity_level="info")
             saturated = True
+
     return len(klee_progress)
 
 def execute_klee(
@@ -227,6 +236,7 @@ def execute_klee(
     flags = [] if flags is None else flags
 
     timeout = None
+    progress = 0
     time_prefix = "--max-time="
     # Get the timeout from the passed flags (hacky)
     for f in flags:
@@ -271,11 +281,21 @@ def execute_klee(
 
     # actually run KLEE
     if flipper_mode:
-        klee_progress = []
-
         # AFL->KTest conversion already done
         command += " -seed-out-dir"
         # start running KLEE with total timeout
+
+        # init klee progress
+        if not os.path.exists(os.path.join(outdir, "run.istats")):
+            klee_progress = []
+            initial_progress_size = 0
+        else:
+            # we had some previous progress
+            klee_progress = compute_klee_progress(outdir)
+            initial_progress_size = len(klee_progress)
+
+            Logger.log("compute_klee_progress: initial progress size is " + str(initial_progress_size) + "\n",
+                       verbosity_level="debug")
 
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=tmpdir, preexec_fn=setsid)
 
@@ -283,7 +303,7 @@ def execute_klee(
         if timeout > 12:
             time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
             # check for saturation
-            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress)
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress) - initial_progress_size
         else:
             # low timeout, no point in checking saturation
             time.sleep(timeout)
@@ -291,13 +311,16 @@ def execute_klee(
         # klee saturated
         # maybe use kill 9 (see below)  os.kill(proc.pid, signal.SIGINT)
         # TODO adapt this
-        time.sleep(10) # Might take a while for KLEE to be killed properly
+        #time.sleep(10) # Might take a while for KLEE to be killed properly
+        killpg(getpgid(proc.pid), signal.SIGKILL)
         retcode = proc.poll()
     else:
         try:
             out = _check_output(
                 command, cwd=tmpdir,
                 timeout=timeout).decode("utf-8", 'ignore')
+            klee_progress = compute_klee_progress(outdir)
+            progress = len(klee_progress)
         except subprocess.TimeoutExpired as terr:
             out = terr.output.decode("utf-8", 'ignore')
             out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
