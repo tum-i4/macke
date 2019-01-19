@@ -143,7 +143,7 @@ def main():
     )
 
     parser.add_argument(
-        '--flipper_timeout',
+        '--flipper-timeout',
         type=int,
         default=30,
         help="Timeout (s) for the experimental fuzzing feature"
@@ -279,7 +279,10 @@ def main():
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries, exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize)
+                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries,
+                  exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, flipper_timeout=args.flipper_timeout,
+                  use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
+                  generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize)
     macke.run_complete_analysis()
 
     Logger.close()
