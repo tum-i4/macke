@@ -196,6 +196,7 @@ class FuzzResult:
         #crashcorpus = path.join(outdir, "crashes")
 
         new_progress = compute_fuzz_progress(outdir)
+        self.testcount = new_progress
 
         if new_progress >= old_progress:
             self.progress = new_progress - old_progress
