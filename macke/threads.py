@@ -45,7 +45,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                verbosity_level="debug")
 
     progress_done = True
-    result = None
+    klee_result = None
+    fuzz_result = None
 
     timeout_timestamp = time.time() + timeout
     #afl_to_klee_dir = path.join(outdir, "afl_to_klee_dir") # macke_errors
@@ -58,7 +59,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
         Logger.log("trying klee on: " + functionname + "\n", verbosity_level="debug")
 
         try:
-            result = execute_klee(
+            klee_result = execute_klee(
                 symmains_bc, functionname, klee_outdir, flipper_mode, flags, posixflags, posix4main, no_optimize,
                 afl_to_klee_dir)
         # pylint: disable=broad-except
@@ -73,29 +74,33 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
 
         # Translate klee files to fuzz files
 
-        if result:
-            if result.progress:
+        if klee_result:
+            if klee_result.progress:
                 progress_done = True
-                Logger.log("KLEE has made progress (" + str(result.progress) + ")\n", verbosity_level="info")
-                argv = []
+                Logger.log("KLEE has made progress (" + str(klee_result.progress) + ")\n", verbosity_level="info")
+                #argv = []
                 Logger.log("klee_outdir: " + klee_outdir + "\n", verbosity_level="debug")
                 #for k in glob.glob(klee_outdir + "/klee-*"):
                 #    argv.extend(process_klee_out(k, fuzzmanager.inputbasedir + "/input"))
-                argv.extend(process_klee_out(klee_outdir, fuzzmanager.inputforfunc[functionname]))
-
+                try:
+                    process_klee_out(klee_outdir, fuzzmanager.inputforfunc[functionname])
+                except:
+                    Logger.log("Unexpected error while processing klee output!\n", verbosity_level="error")
+                    sys.exit(1)
                 # argv = self.clean_argv(argv)
-                Logger.log("argv: " + str(argv) + "\n", verbosity_level="debug")
+                #Logger.log("argv: " + str(argv) + "\n", verbosity_level="debug")
                 time.sleep(2)
 
             else:
                 Logger.log("KLEE has not made progress\n", verbosity_level="debug")
+
 
         # Run fuzzer
         Logger.log("trying afl on: " + functionname + "\n", verbosity_level="debug")
 
         cgroup = cgroupqueue.get()
         try:
-            result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
+            fuzz_result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
         except Exception as exc:
             print()
             print("A fuzz thread in phase one throws an exception")
@@ -106,17 +111,18 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             traceback.print_tb(sys.exc_info()[2])
         cgroupqueue.put(cgroup)
 
-        if result:
-            if result.progress:
+        if fuzz_result:
+            if fuzz_result.progress:
                 progress_done = True
                 # transform fuzz files to klee files
-                result.convert_to_klee_files(fuzzmanager)
-                Logger.log("AFL has made progress (" + str(result.progress) + ")\n", verbosity_level="info")
+                fuzz_result.convert_to_klee_files(fuzzmanager)
+                Logger.log("AFL has made progress (" + str(fuzz_result.progress) + ")\n", verbosity_level="info")
             else:
                 Logger.log("AFL has not made progress\n", verbosity_level="debug")
 
-    resultlist.append(result)
-    result.convert_erros_to_klee_files(["queue", "crashes"])
+
+    resultlist.append(klee_result)
+    fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
 
     Logger.log("done thread_flipper_phase_one: " + functionname + "\n", verbosity_level="debug")
 
