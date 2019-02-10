@@ -98,7 +98,7 @@ def main():
         help="The output directory of the run is put inside this directory")
 
     parser.add_argument(
-        '--max-time',
+        '--max-klee-time',
         nargs='?',
         type=int,
         default=120,
@@ -106,7 +106,7 @@ def main():
     )
 
     parser.add_argument(
-        '--max-instruction-time',
+        '--max-klee-instruction-time',
         nargs='?',
         type=int,
         default=12,
@@ -143,10 +143,10 @@ def main():
     )
 
     parser.add_argument(
-        '--flipper-timeout',
+        '--max-flipper-time',
         type=int,
         default=30,
-        help="Timeout (s) for the experimental fuzzing feature"
+        help="Timeout (s) for the experimental flipper feature"
     )
 
     parser.add_argument(
@@ -157,7 +157,7 @@ def main():
     )
 
     parser.add_argument(
-        '--fuzz-time',
+        '--max-fuzz-time',
         type=int,
         default=10,
         help="Time to fuzz a single function (in seconds)"
@@ -254,8 +254,8 @@ def main():
 
     # Compose KLEE flags given directly by the user
     flags_user = [
-        "--max-time=%d" % args.max_time,
-        "--max-instruction-time=%d" % args.max_instruction_time
+        "--max-time=%d" % args.max_klee_time,
+        "--max-instruction-time=%d" % args.max_klee_instruction_time
     ]
 
     # Compose flags for analysing the main function
@@ -280,8 +280,8 @@ def main():
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
                   args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries,
-                  exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, flipper_timeout=args.flipper_timeout,
-                  use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
+                  exclude_known_from_phase_two=args.exclude_known, use_flipper=args.flipper, max_flipper_time=args.max_flipper_time,
+                  use_fuzzer=args.use_fuzzer, max_fuzz_time=args.max_fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
                   generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize)
     macke.run_complete_analysis()
 

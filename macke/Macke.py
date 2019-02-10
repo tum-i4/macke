@@ -56,9 +56,9 @@ class Macke:
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
                  exclude_known_from_phase_two=True, 
-                 use_flipper=False, flipper_timeout=30, use_fuzzer=False, libraries=None,
+                 use_flipper=False, max_flipper_time=30, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
-                 fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
+                 max_fuzz_time=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
                  fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
@@ -130,7 +130,7 @@ class Macke:
             self.fuzz_lflags += list(map(lambda s: "-l" + s, libraries)) if libraries is not None else []
             self.fuzz_program_bc = path.join(self.bcdir, "fuzz.bc")
             self.fuzz_input_maxlen = fuzz_input_maxlen
-            self.fuzztime = fuzztime
+            self.max_fuzz_time = max_fuzz_time
             self.fuzzdir = path.join(self.rundir, "fuzzer")
             self.fuzzbc = fuzzbc
             self.fuzz_smartinput = generate_smart_fuzz_input
@@ -138,7 +138,7 @@ class Macke:
 
         # Setting the flipper
         self.use_flipper = use_flipper
-        self.flipper_timeout = flipper_timeout
+        self.max_flipper_time = max_flipper_time
 
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
@@ -155,7 +155,7 @@ class Macke:
             options["use_fuzzer"] = self.use_fuzzer
             options["use_flipper"] = self.use_flipper
             if self.use_fuzzer:
-                options["fuzz-time"] = self.fuzztime
+                options["max-fuzz-time"] = self.max_fuzz_time
                 options["fuzz-stop-when-done"] = self.fuzz_stop_when_done
                 options["fuzz-smart-input"] = self.fuzz_smartinput
                 options["fuzz-input-maxlen"] = self.fuzz_input_maxlen
@@ -465,7 +465,7 @@ class Macke:
 
             json.dump(info, file)
 
-        Logger.log("line coverage: " + linecoverage(self.rundir) + "\n", verbosity_level="info")
+        Logger.log("line coverage: " + str(linecoverage(self.rundir)) + "\n", verbosity_level="info")
 
         self.create_macke_last_symlink()
 
@@ -565,7 +565,7 @@ class Macke:
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
                                           afl_outdir, afl_to_klee_dir,
-                                          self.fuzztime, False)
+                                          self.max_fuzz_time, False)
                                          )
                     elif type is self.SYM_ONLY:
                         Logger.log(str(function) + " -- symbolic testing only\n", verbosity_level="debug")
@@ -582,11 +582,11 @@ class Macke:
                         afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_flipper_phase_one, (
                                           self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          afl_outdir, afl_to_klee_dir, self.fuzztime, self.symmains_bc,
+                                          afl_outdir, afl_to_klee_dir, self.max_fuzz_time, self.symmains_bc,
                                           self.get_next_klee_directory(
                                            dict(phase=phase, bcfile=self.symmains_bc,
                                                 function=function)),
-                                          self.flags_user, self.posixflags, self.posix4main, self.flipper_timeout,
+                                          self.flags_user, self.posixflags, self.posix4main, self.max_fuzz_time,
                                           self.no_optimize, True)
                                          )
             else:
@@ -597,7 +597,7 @@ class Macke:
                         afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          afl_outdir, afl_to_klee_dir, self.fuzztime, False))
+                                          afl_outdir, afl_to_klee_dir, self.max_fuzz_time, False))
                 else:
                     # symbolic execution only
                     for function in run:
