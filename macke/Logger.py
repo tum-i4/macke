@@ -4,6 +4,7 @@ Logging used in debug mode
 """
 
 import sys
+import os
 
 
 class Logger:
@@ -35,7 +36,8 @@ class Logger:
     def log(message: str, verbosity_level="info"):
         if verbosity_level in Logger.accepted_verbosity_levels:
             if verbosity_level is not "info":
-                Logger.log_file.write("(" + verbosity_level + "): ")
+                Logger.log_file.write("(" + verbosity_level + ") ")
+            Logger.log_file.write("[" + str(os.getpid()) + "]: ")
             Logger.log_file.write(message)
 
     @staticmethod
