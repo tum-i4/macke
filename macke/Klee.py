@@ -189,6 +189,7 @@ def compute_klee_progress(path: str):
     shutil.rmtree(tmp_istats_dir)
     return klee_progress#(klee_progress, progress_done)
 
+SATURATION_CHECK_PERIOD = 12
 def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
     saturated = False
     #progress_done = False
@@ -199,7 +200,7 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
             saturated = True
             continue
 
-        if (int(max_time_each) + start_time - time.time()) > 12:
+        if (int(max_time_each) + start_time - time.time()) > SATURATION_CHECK_PERIOD:
             # we can sleep an entire period and recheck the output
             time.sleep(12)
         else:
@@ -249,14 +250,23 @@ def execute_klee(
     if no_optimize:
         flags.remove("--optimize")
 
-    # set write-interval to the timeout - 2, as we will kill klee when it reaches timeout
     if timeout is None:
         flags.append("--stats-write-interval=3600")
         flags.append("--istats-write-interval=3600")
         timeout = 3600
     else:
-        flags.append("--stats-write-interval=" + str(timeout - 2))
-        flags.append("--istats-write-interval=" + str(timeout - 2))
+        if not flipper_mode:
+            flags.append("--stats-write-interval=" + str(timeout))
+            flags.append("--istats-write-interval=" + str(timeout))
+        else: # flipper
+            # set write-interval to the timeout / SATURATION_CHECK_PERIOD
+            if timeout > SATURATION_CHECK_PERIOD:
+                flags.append("--stats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+                flags.append("--istats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+            else:
+                # low timeout
+                flags.append("--stats-write-interval=1")
+                flags.append("--istats-write-interval=1")
 
     # Build the posix flags
     posixflags = [] if posixflags is None else posixflags
@@ -350,4 +360,4 @@ def execute_klee_targeted_search(
     flags = [] if flags is None else flags
     flags = ["--search=sonar", "--sonar-target=function-call", "--sonar-target-info=" + targetfunc] + flags
     return execute_klee(
-        bcfile, analyzedfunc, outdir, flags, posixflags, posix4main, no_optimize)
+        bcfile, analyzedfunc, outdir, False, flags, posixflags, posix4main, no_optimize)
