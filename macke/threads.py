@@ -48,12 +48,18 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
     klee_result = None
     fuzz_result = None
 
+    flip_counter = 0
+
     timeout_timestamp = time.time() + timeout
     #afl_to_klee_dir = path.join(outdir, "afl_to_klee_dir") # macke_errors
 
     while progress_done and (time.time() < timeout_timestamp):
         # TODO: in case of no progress, keep going until at least some progress is done?
         progress_done = False
+
+        if flip_counter > 0:
+            Logger.log("Flipping!\n", verbosity_level="debug")
+        flip_counter += 1
 
         # Run klee
         Logger.log("trying klee on: " + functionname + "\n", verbosity_level="debug")
@@ -124,7 +130,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
     resultlist.append(klee_result)
     fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
 
-    Logger.log("done thread_flipper_phase_one: " + functionname + "\n", verbosity_level="debug")
+    Logger.log("done thread_flipper_phase_one on : " + functionname + " (flipped " + str(flip_counter-1) + " times)\n", verbosity_level="debug")
 
 def thread_phase_one(
         resultlist, functionname, symmains_bc, outdir,
