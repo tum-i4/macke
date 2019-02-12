@@ -17,10 +17,16 @@ from progressbar import ProgressBar, widgets
 from .CallGraph import CallGraph
 from .config import (CONFIGFILE, THREADNUM, get_current_git_hash,
                      get_klee_git_hash, get_llvm_opt_git_hash)
+from .constants import UCLIBC_LIBS, FUZZFUNCDIR_PREFIX
 from .ErrorRegistry import ErrorRegistry
+from .Error import Error
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
-from .threads import thread_phase_one, thread_phase_two
+from .threads import thread_phase_one, thread_fuzz_phase_one, thread_phase_two
+
+from .cgroups import get_cgroups
+
+from .Fuzzer import FuzzManager
 
 # The widgets used by the process bar
 WIDGETS = [
@@ -40,19 +46,36 @@ class Macke:
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
-                 exclude_known_from_phase_two=True):
+                 exclude_known_from_phase_two=True, use_fuzzer=False, libraries=None,
+                 fuzzlibdir=None,
+                 fuzztime=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
+                 fuzzbc=None, fuzz_input_maxlen=32):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
+
+        if fuzzbc is None:
+            fuzzbc = bitcodefile
+        else:
+            assert path.isfile(fuzzbc)
 
         # store the path to the analyzed bitcode file
         self.bitcodefile = bitcodefile
 
+        # add libraries to flags_user
+        self.flags_user = []
+        if libraries is not None:
+            for l in libraries:
+                if l not in UCLIBC_LIBS:
+                    self.flags_user.append("-load=lib"+l+".so")
+
+
         # Store information from command line
         self.comment = comment
-        self.flags_user = flags_user if flags_user is not None else []
+        self.flags_user += flags_user if flags_user is not None else []
         self.posixflags = posixflags if posixflags is not None else []
         self.posix4main = posix4main if posix4main is not None else []
         self.exclude_known_from_phase_two = exclude_known_from_phase_two
+
 
         # generate name of directory with all run results
         self.starttime = datetime.now()
@@ -87,6 +110,37 @@ class Macke:
 
         # Setting quiet == True suppress all outputs
         self.quiet = quiet
+
+        # Setting the fuzzdir
+        self.use_fuzzer = use_fuzzer
+        if use_fuzzer:
+            self.fuzz_lflags = []
+            if fuzzlibdir is not None:
+                self.fuzz_lflags += [ "-L" + path.abspath(fuzzlibdir) ]
+            self.fuzz_lflags += list(map(lambda s: "-l" + s, libraries)) if libraries is not None else []
+            self.fuzz_program_bc = path.join(self.bcdir, "fuzz.bc")
+            self.fuzz_input_maxlen = fuzz_input_maxlen
+            self.fuzztime = fuzztime
+            self.fuzzdir = path.join(self.rundir, "fuzzer")
+            self.fuzzbc = fuzzbc
+            self.fuzz_smartinput = generate_smart_fuzz_input
+            self.fuzz_stop_when_done = stop_fuzz_when_done
+
+
+    def save_options(self, to):
+        with open(to, 'w') as file:
+            options = OrderedDict()
+
+            options["exclude_known"] = self.exclude_known_from_phase_two
+            options["klee-max-time"] = int(next(filter(lambda f : f.startswith("--max-time="), self.flags_user))[len("--max-time="):])
+            options["use_fuzzer"] = self.use_fuzzer
+            if self.use_fuzzer:
+                options["fuzz-time"] = self.fuzztime
+                options["fuzz-stop-when-done"] = self.fuzz_stop_when_done
+                options["fuzz-smart-input"] = self.fuzz_smartinput
+                options["fuzz-input-maxlen"] = self.fuzz_input_maxlen
+
+            json.dump(options, file)
 
     def get_next_klee_directory(self, info):
         """
@@ -145,13 +199,27 @@ class Macke:
             info["llvm-opt-git-version-hash"] = get_llvm_opt_git_hash()
             info["klee-git-version-hash"] = get_klee_git_hash()
             info["analyzed-bitcodefile"] = path.abspath(self.bitcodefile)
+            if self.use_fuzzer:
+                info["fuzzer-bitcodefile"] = path.abspath(self.fuzzbc)
             info["run-argv"] = sys.argv
             info["comment"] = self.comment
             json.dump(info, file)
 
+        self.save_options(path.join(self.rundir, "options.json"))
+
         # Initialize a file for klee directory mapping
         with open(self.kleejson, 'w') as file:
             file.write("{")
+
+
+        # Initialize fuzzing
+        if self.use_fuzzer:
+            # copy the unmodified bitcode file (fuzzer one)
+            shutil.copy2(self.fuzzbc, self.fuzz_program_bc)
+            builddir = path.join(self.fuzzdir, "build")
+            makedirs(builddir)
+            self.create_macke_last_symlink()
+            self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None, self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen, self.qprint)
 
         # Print some information for the user
         self.qprint(
@@ -166,6 +234,9 @@ class Macke:
         # Generate a call graph
         self.callgraph = CallGraph(self.bitcodefile)
 
+        Error.set_program_functions(self.callgraph.get_internal_functions())
+
+
         # Fill a list of functions for the symbolic encapsulation
         tasks = self.callgraph.list_symbolic_encapsulable(
             removemain=not bool(self.posix4main))
@@ -173,7 +244,11 @@ class Macke:
         self.qprint("Phase 1: %d of %d functions are suitable for symbolic "
                     "encapsulation" % (len(tasks), len(self.callgraph.graph)))
 
+        self.count_phase1_functions = len(tasks)
+        self.count_functions = len(self.callgraph.graph)
+
         self.qprint("Phase 1: Adding new entry points ...", end="", flush=True)
+
         # Copy the program bc before encapsulating everything symbolically
         shutil.copy2(self.program_bc, self.symmains_bc)
 
@@ -182,18 +257,34 @@ class Macke:
             if functionname != "main":
                 encapsulate_symbolic(self.symmains_bc, functionname)
         self.qprint(" done")
-        self.qprint("Phase 1: Performing KLEE runs ...")
+
+
+        if self.use_fuzzer:
+            tasks = self.fuzz_manager.list_suitable_drivers()
+            self.count_phase1_functions = len(tasks)
+            self.qprint("Phase 1 - with fuzzing: %d of %d functions are suitable for fuzzing" 
+                         % (len(tasks), len(self.callgraph.graph)))
+
+        if self.use_fuzzer:
+            self.qprint("Phase 1: Performing afl-fuzz runs ...")
+        else:
+            self.qprint("Phase 1: Performing KLEE runs ...")
 
         pbar = ProgressBar(
             widgets=WIDGETS, max_value=len(tasks)) if not self.quiet else None
+
+        self.starttimephase1 = datetime.now()
         self.__execute_in_parallel_threads(tasks, 1, pbar)
 
         if not self.quiet:
             pbar.finish()
 
-        self.qprint("Phase 1: Found %d KLEE errors spread over %d functions" %
-                    (self.errorregistry.errorcounter,
+        self.qprint("Phase 1: Found %d chains (errors: %d) spread over %d functions" %
+                    (self.errorregistry.count_chains(),
+                     self.errorregistry.errorcounter,
                      self.errorregistry.count_functions_with_errors()))
+
+        self.phase_one_summary = (self.errorregistry.count_chains(), self.errorregistry.errorcounter, self.errorregistry.count_functions_with_errors(), self.errorregistry.count_vulnerable_instructions())
 
     def run_phase_two(self):
         """
@@ -231,6 +322,8 @@ class Macke:
         self.qprint("Phase 2: %d additional KLEE analyzes propagate %d "
                     "errors" % (qualified - totallyskipped,
                                 self.errorregistry.mackerrorcounter))
+        self.phase2_runs = qualified - totallyskipped
+        self.propagated = self.errorregistry.mackerrorcounter
 
     def run_finalization(self):
         """
@@ -240,8 +333,9 @@ class Macke:
 
         self.qprint("Summary: %d tests were generated with %d KLEE runs" %
                     (self.testcases, self.kleecount))
-        self.qprint("Summary: %d errors were detected spread over %d "
+        self.qprint("Summary: %d chains (errors: %d) were detected spread over %d "
                     "functions" % (
+                        self.errorregistry.count_chains(),
                         self.errorregistry.errorcounter,
                         self.errorregistry.count_functions_with_errors()))
 
@@ -249,11 +343,33 @@ class Macke:
         with open(self.kleejson, 'a') as file:
             file.write("}")
 
+        with open(path.join(self.rundir, "summary.json"), 'w') as file:
+            info = OrderedDict()
+
+            p1_chain, p1_errc, p1_errf, p1_vinst_count = self.phase_one_summary
+            info["num-functions"] = self.count_functions
+            info["phase-one-functions"] = self.count_phase1_functions
+            info["phase-one-chains"] = p1_chain
+            info["phase-one-error-count"] = p1_errc
+            info["phase-one-count-error-funcs"] = p1_errf
+            info["phase-one-vinst-count"] = p1_vinst_count
+
+            info["phase-two-runs"] = self.phase2_runs
+            info["phase-two-propagated"] = self.propagated
+
+            info["total-chains"] = self.errorregistry.count_chains()
+            info["total-error-count"] = self.errorregistry.errorcounter
+            info["total-count-error-funcs"] = self.errorregistry.count_functions_with_errors()
+
+            json.dump(info, file)
+
+
         # Export all the data gathered so far to a json file
         with open(path.join(self.rundir, "timing.json"), 'w') as file:
             info = OrderedDict()
 
             info["start"] = self.starttime.isoformat()
+            info["start-phase-one"] = self.starttimephase1.isoformat()
             info["start-phase-two"] = self.starttimephase2.isoformat()
             info["end"] = self.endtime.isoformat()
 
@@ -305,9 +421,15 @@ class Macke:
         manager = Manager()
         kleedones = manager.list()
 
+        cgroups_queue = None
+        if self.use_fuzzer and phase == 1:
+            cgroups_queue = manager.Queue()
+            for cgroup in get_cgroups():
+                cgroups_queue.put(cgroup)
+
         # Dispense the KLEE runs on the workers in the pool
         skipped = self.__put_phase_threads_into_pool(
-            phase, pool, run, kleedones)
+            phase, pool, run, kleedones, cgroups_queue)
 
         # close the pool after all KLEE runs are registered
         pool.close()
@@ -328,7 +450,7 @@ class Macke:
 
         return skipped
 
-    def __put_phase_threads_into_pool(self, phase, pool, run, resultlist):
+    def __put_phase_threads_into_pool(self, phase, pool, run, resultlist, cgroups_queue):
         """
         Store a given run for one phase with the required arguments
         into the thread pool
@@ -339,13 +461,16 @@ class Macke:
 
         if phase == 1:
             for function in run:
-                pool.apply_async(thread_phase_one, (
-                    resultlist, function, self.symmains_bc,
-                    self.get_next_klee_directory(
-                        dict(phase=phase, bcfile=self.symmains_bc,
-                             function=function)),
-                    self.flags_user, self.posixflags, self.posix4main
-                ))
+                if self.use_fuzzer:
+                    pool.apply_async(thread_fuzz_phase_one, (self.fuzz_manager, cgroups_queue, resultlist, function, path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function), self.fuzztime))
+                else:
+                    pool.apply_async(thread_phase_one, (
+                        resultlist, function, self.symmains_bc,
+                        self.get_next_klee_directory(
+                            dict(phase=phase, bcfile=self.symmains_bc,
+                                 function=function)),
+                        self.flags_user, self.posixflags, self.posix4main
+                    ))
             # You cannot skip anything in phase one -> 0 skips
         elif phase == 2:
             for (caller, callee) in run:

@@ -15,8 +15,8 @@ def partial(macke_directory):
     Extract information about all partial error analysis during a MACKE run
     """
 
-    registry = get_error_registry_for_mackedir(macke_directory)
     clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    registry = get_error_registry_for_mackedir(macke_directory, clg)
     klees = reconstruct_from_macke_dir(macke_directory)
     kinfos = get_klee_registry_from_mackedir(macke_directory)
 
@@ -52,9 +52,10 @@ def partial(macke_directory):
         erroneous, callpairs = set(), set()
         for error in errorlist:
             erroneous.add(error.entryfunction)
-            callpairs.update(
-                {(caller, error.entryfunction)
-                 for caller in clg[error.entryfunction]["calledby"]})
+            if clg[error.entryfunction]:
+                callpairs.update(
+                    {(caller, error.entryfunction)
+                     for caller in clg[error.entryfunction]["calledby"]})
 
         border = {(cler, clee) for (cler, clee) in callpairs
                   if cler not in erroneous}

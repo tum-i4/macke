@@ -19,7 +19,7 @@ def functions(macke_directory):
     symenccount = sum(1 for func in clg.graph
                       if clg.is_symbolic_encapsulable(func))
 
-    registry = get_error_registry_for_mackedir(macke_directory)
+    registry = get_error_registry_for_mackedir(macke_directory, clg)
 
     result = OrderedDict([
         ("totalfunctioncount", totalfunccount),

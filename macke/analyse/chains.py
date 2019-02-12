@@ -15,12 +15,28 @@ def chains(macke_directory):
     Extract the information about the error chains as an OrderedDict
     """
 
-    registry = get_error_registry_for_mackedir(macke_directory)
     clg = CallGraph(path.join(macke_directory, "bitcode", "program.bc"))
+    registry = get_error_registry_for_mackedir(macke_directory, clg)
 
-    errchains = reconstruct_all_error_chains(registry, clg)
-    chainlengths = [len(chain)
-                    for _, chainlist in errchains.items()
+    funcs = set(clg.get_flattened_inverted_topology())
+
+    errchains = registry.get_chains()
+
+    # Group chains by vulninst
+    detail_dict = dict()
+    for chain in errchains:
+        vulninst = chain.get_vulnerable_instruction()
+        if vulninst not in detail_dict:
+            detail_dict[vulninst] = []
+        fchain = list(map(lambda x : x[0], chain.filtered_trace(funcs)))
+        if fchain not in detail_dict[vulninst]:
+            detail_dict[vulninst].append(fchain)
+
+    for chains in detail_dict.values():
+        chains.sort(key = lambda x: (-len(x), "@".join(x)))
+
+    chainlengths = [len(set(chain))
+                    for _, chainlist in detail_dict.items()
                     for chain in chainlist]
 
     # Calculate old 1-level-up statistic
@@ -31,18 +47,23 @@ def chains(macke_directory):
                 registry.get_all_vulninst_for_func(caller) &
                 registry.get_all_vulninst_for_func(callee))
 
-    # Count the end phases
+
+    # Count phase ends
     endphaseone, endphasetwo = 0, 0
-    for vulninst, chainlist in errchains.items():
+    for vulninst, chainlist in detail_dict.items():
         for chain in chainlist:
             # candidaterror are all errors, that end this chain
             # normally, this is just one error, but circles can have several
-            if any(candidaterror.vulnerable_instruction == vulninst and
-                   candidaterror.errfile.endswith(".macke.err")
-                   for candidaterror in registry.forfunction[chain[-1]]):
-                endphasetwo += 1
-            else:
-                endphaseone += 1
+            try:
+                if any(candidaterror.vulnerable_instruction == vulninst and
+                       candidaterror.errfile.endswith(".macke.err")
+                       for candidaterror in registry.forfunction[chain[-1]]):
+                    endphasetwo += 1
+                else:
+                    endphaseone += 1
+            except KeyError:
+                print("Exception: %s not in registry for some reason. Skipping."%(chain[-1]))
+
 
     result = OrderedDict([
         ("count", len(chainlengths)),
@@ -52,13 +73,40 @@ def chains(macke_directory):
             ("avg", mean(chainlengths) if chainlengths else -1),
             ("std", stdev(chainlengths) if len(chainlengths) > 2 else -1),
         ])),
-        ("longerthanone", len([True for c in chainlengths if c > 1])),
         ("1-level-up", onelevelup),
+        ("longerthanone", len([True for c in chainlengths if c > 1])),
         ("end-found-by-phase-one", endphaseone),
         ("end-found-by-phase-two", endphasetwo),
-        ("detail", errchains),
+        ("detail", detail_dict)
     ])
     return result
+    ## LEGACY
+    #errchains = reconstruct_all_error_chains(registry, clg)
+    #chainlengths = [len(chain)
+    #                for _, chainlist in errchains.items()
+    #                for chain in chainlist]
+
+    ## Calculate old 1-level-up statistic
+    #onelevelup = 0
+    #for caller in clg.get_flattened_inverted_topology():
+    #    for callee in clg[caller]['calls']:
+    #        onelevelup += len(
+    #            registry.get_all_vulninst_for_func(caller) &
+    #            registry.get_all_vulninst_for_func(callee))
+
+    ## Count the end phases
+    #endphaseone, endphasetwo = 0, 0
+    #for vulninst, chainlist in errchains.items():
+    #    for chain in chainlist:
+    #        # candidaterror are all errors, that end this chain
+    #        # normally, this is just one error, but circles can have several
+    #        if any(candidaterror.vulnerable_instruction == vulninst and
+    #               candidaterror.errfile.endswith(".macke.err")
+    #               for candidaterror in registry.forfunction[chain[-1]]):
+    #            endphasetwo += 1
+    #        else:
+    #            endphaseone += 1
+    # ("1-level-up", onelevelup),
 
 
 def main():
