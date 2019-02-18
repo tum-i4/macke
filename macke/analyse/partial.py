@@ -29,9 +29,17 @@ def partial(macke_directory):
     kphasetwo = dict()  # caller,callee -> kleeResult
     for _, kinfo in kinfos.items():
         if kinfo["phase"] == 1:
-            kphaseone[kinfo["function"]] = kinfo["klee"]
+            if "klee" in kinfo:
+                kphaseone[kinfo["function"]] = kinfo["klee"]
+            else:
+                pass
+                #kphaseone[kinfo["function"]] = 0
         elif kinfo["phase"] == 2:
-            kphasetwo[(kinfo["caller"], kinfo["callee"])] = kinfo["klee"]
+            if "klee" in kinfo:
+                kphasetwo[(kinfo["caller"], kinfo["callee"])] = kinfo["klee"]
+            else:
+                pass
+                #kphasetwo[(kinfo["caller"], kinfo["callee"])] = 0
 
     # Sanitized  I: All leafs are only from phase one and have no errors
     sanatizedone = 0
