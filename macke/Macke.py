@@ -55,11 +55,12 @@ class Macke:
     def __init__(self, bitcodefile, comment="",
                  parentdir="/tmp/macke", quiet=False,
                  flags_user=None, posixflags=None, posix4main=None,
-                 exclude_known_from_phase_two=True, 
+                 exclude_known_from_phase_two=True, max_klee_time = 30,
                  use_flipper=False, max_flipper_time=30, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  max_fuzz_time=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
-                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False):
+                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False,
+                 flip_logging_desired=False, cov_executable=None, cov_source=None):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -109,6 +110,8 @@ class Macke:
         # Internal counter for the number of klee runs
         self.kleecount = 0
 
+        self.max_klee_time = max_klee_time
+
         # Initialize some statistic counter
         self.testcases = 0
 
@@ -139,6 +142,10 @@ class Macke:
         # Setting the flipper
         self.use_flipper = use_flipper
         self.max_flipper_time = max_flipper_time
+        self.flip_logging_desired = flip_logging_desired
+        # Setting the flip logging
+        self.cov_executable = cov_executable
+        self.cov_source = cov_source
 
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
@@ -243,7 +250,7 @@ class Macke:
 
             self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None,
                                             self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen,
-                                            self.qprint)
+                                            self.qprint, self.cov_executable, self.cov_source)
 
         # Print some information for the user
         self.qprint(
@@ -571,7 +578,7 @@ class Macke:
                         Logger.log(str(function) + " -- symbolic testing only\n", verbosity_level="debug")
                         pool.apply_async(thread_phase_one, (
                             resultlist, function, self.symmains_bc, self.get_next_klee_directory(
-                                dict(phase=phase, bcfile=self.symmains_bc,function=function)),
+                                dict(phase=phase, bcfile=self.symmains_bc,function=function)), self.max_klee_time,
                             self.flags_user, self.posixflags, self.posix4main, self.no_optimize, False
                             ))
                     else:
@@ -585,9 +592,9 @@ class Macke:
                                           afl_outdir, afl_to_klee_dir, self.max_fuzz_time, self.symmains_bc,
                                           self.get_next_klee_directory(
                                            dict(phase=phase, bcfile=self.symmains_bc,
-                                                function=function)),
-                                          self.flags_user, self.posixflags, self.posix4main, self.max_fuzz_time,
-                                          self.no_optimize, True)
+                                                function=function)), self.max_klee_time,
+                                          self.flags_user, self.posixflags, self.posix4main, self.max_flipper_time,
+                                          self.no_optimize, True, self.flip_logging_desired)
                                          )
             else:
                 if self.use_fuzzer:
@@ -605,7 +612,7 @@ class Macke:
                             resultlist, function, self.symmains_bc,
                             self.get_next_klee_directory(
                                 dict(phase=phase, bcfile=self.symmains_bc,
-                                     function=function)),
+                                     function=function)), self.max_klee_time,
                             self.flags_user, self.posixflags, self.posix4main, self.no_optimize,
                             False
                         ))

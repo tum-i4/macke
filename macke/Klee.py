@@ -175,7 +175,7 @@ def parse_run_istats(istats_file):
     return covered
 
 def compute_klee_progress(path: str):
-    progress_done = False
+    #progress_done = False
     tmp_istats_dir = tempfile.mkdtemp()
     os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
     new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
@@ -190,7 +190,7 @@ def compute_klee_progress(path: str):
     return klee_progress#(klee_progress, progress_done)
 
 SATURATION_CHECK_PERIOD = 12
-def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
+def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger):
     saturated = False
     #progress_done = False
 
@@ -223,12 +223,14 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress):
         else:
             Logger.log("KLEE saturated. No new line-coverage found\n", verbosity_level="info")
             saturated = True
+        if plot_data_logger:
+            plot_data_logger.log_klee_coverage()
 
     return len(klee_progress)
 
 def execute_klee(
-        bcfile, analyzedfunc, outdir, flipper_mode,
-        flags=None, posixflags=None, posix4main=None, no_optimize=False, afl_to_klee_dir=""):
+        bcfile, analyzedfunc, outdir, timeout, flipper_mode,
+        flags=None, posixflags=None, posix4main=None, no_optimize=False, afl_to_klee_dir="", plot_data_logger=None):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
@@ -236,8 +238,9 @@ def execute_klee(
     # use empty list as default flags
     flags = [] if flags is None else flags
 
-    timeout = None
     progress = 0
+
+    '''
     time_prefix = "--max-time="
     # Get the timeout from the passed flags (hacky)
     for f in flags:
@@ -245,6 +248,7 @@ def execute_klee(
             # double the timeout for killing to be safe with time inprecisions
             timeout = 2 * int(f[len(time_prefix):])
             break
+    '''
 
     flags.extend(KLEEFLAGS)
     if no_optimize:
@@ -313,7 +317,8 @@ def execute_klee(
         if timeout > 12:
             time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
             # check for saturation
-            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress) - initial_progress_size
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger) - \
+                       initial_progress_size
         else:
             # low timeout, no point in checking saturation
             time.sleep(timeout)

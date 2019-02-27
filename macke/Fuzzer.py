@@ -140,6 +140,11 @@ def extract_fuzzer_coverage(macke_directory):
 def get_files_from_dir(dir: str):
     files = []
 
+    if not os.path.exists(dir):
+        Logger.log("get_files_from_dir: " + dir + " does not exits! Defaulting return value to [].",
+                   verbosity_level="warning")
+        return []
+
     for f in listdir(dir):
         if f.endswith(".ktest"):
             Logger.log("compute_fuzz_process: added " + f + "\n", verbosity_level="debug")
@@ -166,6 +171,12 @@ def get_files_from_dir(dir: str):
     return files
 
 def compute_fuzz_progress(outdir: str):
+
+    if not os.path.exists(outdir):
+        Logger.log("compute_fuzz_progress: " + outdir + " does not exits! Defaulting progress to 0.",
+                   verbosity_level="warning")
+        return 0
+
     inputcorpus = path.join(outdir, "queue")
     crashcorpus = path.join(outdir, "crashes")
     hangcorpus = path.join(outdir, "hangs")
@@ -306,7 +317,8 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
+    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True,
+                 input_maxlen=32, print_func=print, cov_executable=None, cov_source=None):
         """
         Compile necessary binaries and save the names to them
         """
@@ -393,6 +405,12 @@ class FuzzManager:
         self.already_processed_lines = 1
         self.saturation_index = 0
 
+        # flip logging
+        Logger.log("flip logging: cov_executable " + str(cov_executable) + "\n", verbosity_level="debug")
+        Logger.log("flip logging: cov_source " + str(cov_source) + "\n", verbosity_level="debug")
+        self.cov_executable = cov_executable
+        self.cov_source = cov_source
+
 
     def init_inputdirs(self):
         functions = self.list_suitable_drivers()
@@ -477,8 +495,7 @@ class FuzzManager:
                 Logger.log("cycles: " + str(cycles) + " pending_totals: " + str(pending_totals) +
                            " pending_favs: " + str(pending_favs) + "\n", verbosity_level="debug")
 
-                if not (pending_favs or pending_totals): # no inputs to
-                    # no inputs to check right away
+                if not (pending_favs or pending_totals): # no inputs to check right away
                     if cycles:
                         # cycles done: converge fast
                         self.saturation_index += 2
@@ -496,7 +513,7 @@ class FuzzManager:
 
         return saturated
 
-    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool):
+    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool, plot_data_logger):
         # Depending on flipper, either time.sleep or time.sleep till afl_saturates
 
         Logger.log("waiting for stopping conditions for outdir " +
@@ -512,11 +529,17 @@ class FuzzManager:
             SATURATION_CHECK_PERIOD = 6 # default afl PLOT_UPDATE_SEC value
             for i in range(0, int(fuzztime/SATURATION_CHECK_PERIOD)):
                 time.sleep(SATURATION_CHECK_PERIOD)
+                if plot_data_logger:
+                    plot_data_logger.log_fuzzer_progress()
+                else:
+                    Logger.log("test manu: plot_data_logger not set\n", verbosity_level="debug") # TODO: remove
                 if self.afl_saturated(outdir):
                     Logger.log("saturation detected\n", verbosity_level="debug")
                     break
             # sleep remaining time (if any)
             time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
+            if plot_data_logger:
+                plot_data_logger.log_fuzzer_progress()
 
             # saturation reached
             if not resume:
@@ -529,7 +552,29 @@ class FuzzManager:
                                + "\n", verbosity_level="debug")
             self.saturation_index = 0
 
-    def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool, afl_to_klee_dir: str):
+    def call_afl_cov(self, afl_output_dir, coverage_executable, afl_command_args, coverage_source, live=False):
+        Logger.log("Attempting to call afl-cov: %s %s %s" % (afl_output_dir, coverage_executable, coverage_source) +
+                   "\n", verbosity_level="debug")
+        if live:
+            live_arg = "--live --background --quiet --sleep 2"
+        else:
+            live_arg = ""
+        ret = os.system(
+            "afl-cov -d %s %s --coverage-cmd \"%s %s AFL_FILE\" --code-dir %s --coverage-include-lines" % (
+            afl_output_dir, live_arg, coverage_executable, afl_command_args, coverage_source))
+
+        if ret == 0:
+            Logger.log("Dispatching afl-cov was successful\n\t%s" % (afl_output_dir) + "\n", verbosity_level="debug")
+        else:
+            Logger.log(
+            "afl-cov -d %s %s --coverage-cmd \"%s %s AFL_FILE\" --code-dir %s --coverage-include-lines" % (
+            afl_output_dir, live_arg, coverage_executable, afl_command_args, coverage_source), verbosity_level="debug")
+            Logger.log("FAILED to dispatch afl-cov\n\treturn value: %d" % (ret) + "\n", verbosity_level="debug")
+
+        return ret
+
+    def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool, afl_to_klee_dir: str,
+                         plot_data_logger=None):
         resume = False
         # This creates outdir + error dir, if not already existing
         if not os.path.exists(afl_to_klee_dir):
@@ -543,9 +588,15 @@ class FuzzManager:
 
 
         outfd = open(path.join(outdir, "output.txt"), "w")
-        #TODO: Optional: Run parallel afl_cov to gather coverage stats
-        #TODO: see if we can reuse ASAN coverage
-        #TODO: check if we can use -M/-S
+
+        # Optional: Run parallel afl_cov to gather coverage stats
+
+        if plot_data_logger:
+            if self.cov_source and self.cov_executable:
+                self.call_afl_cov(outdir, self.cov_executable, " ", self.cov_source, True)
+            else:
+                Logger.log("Cannot log plot data because the coverage sources or executable are missing",
+                           verbosity_level="warning")
 
         if resume:
             proc = cgroups_Popen([AFLFUZZ, "-i-", "-o", outdir, "-m", "none",
@@ -560,11 +611,12 @@ class FuzzManager:
             Logger.log("fuzzing command " + AFLFUZZ + " -i " + self.inputforfunc[functionname] + " -o " + outdir + " -m " + " none " +
                               self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
 
+
         Logger.log("fuzzing " + functionname + "\n", verbosity_level="debug")
         Logger.log("outdir " + outdir + "\n", verbosity_level="debug")
 
         # Run saturation check
-        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume)
+        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume, plot_data_logger)
         Logger.log("AFL saturated\n", verbosity_level="debug")
 
         try:
