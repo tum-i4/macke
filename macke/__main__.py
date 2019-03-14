@@ -4,6 +4,9 @@ Start a complete analysis with the MACKE toolchain on a given bitcode file
 import argparse
 import sys
 
+from datetime import datetime
+from os import path
+
 from .config import check_config
 from .cgroups import initialize_cgroups, validate_cgroups
 from .Macke import Macke
@@ -290,10 +293,15 @@ def main():
     if args.sym_stdin:
         posixflags.append("-sym-stdin")
         posixflags.append(str(args.sym_stdin))
-
+    
+    if args.log_file:
+        Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
+    else:
+        starttime = datetime.now()
+        log_file = starttime.strftime("%Y-%m-%d-%H-%M-%S.log")
+        Logger.open(verbosity_level=args.verbosity_level, filename=path.join(args.parent_dir, log_file))
+    
     fuzzbc = args.fuzz_bc.name if args.fuzz_bc is not None else None
-
-    Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,

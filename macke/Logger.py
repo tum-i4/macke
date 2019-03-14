@@ -17,6 +17,7 @@ class Logger:
     VERBOSITY_LEVELS = ["none", "error", "warning", "info", "debug"]
     accepted_verbosity_levels = []
     log_file = None
+    log_filename = None
 
     @staticmethod
     def open(verbosity_level="error", filename=None):
@@ -30,18 +31,29 @@ class Logger:
         Logger.accepted_verbosity_levels = Logger.VERBOSITY_LEVELS[: index + 1]
 
         if filename:
-            Logger.log_file = open(filename, "w")
+            Logger.log_filename = filename
+            #Logger.log_file = open(filename, "a+")
         else:
             # write to stdout
+            Logger.log_filename = "STDOUT"
+            #Logger.log_file = sys.stdout
+
+    @staticmethod
+    def openfile():
+        if Logger.log_filename=="STDOUT":
             Logger.log_file = sys.stdout
+        else:
+            Logger.log_file = open(Logger.log_filename, "a+")
 
     @staticmethod
     def log(message: str, verbosity_level="info"):
+        Logger.openfile()
         if verbosity_level in Logger.accepted_verbosity_levels:
             if verbosity_level is not "info":
                 Logger.log_file.write("(" + verbosity_level + ") ")
             Logger.log_file.write("[" + str(os.getpid()) + "]: ")
             Logger.log_file.write(message)
+        Logger.close()
 
     @staticmethod
     def close():
