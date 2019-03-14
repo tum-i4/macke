@@ -281,8 +281,8 @@ class Macke:
         f_tasks = [] # temporary container for tasks that are only suitable for fuzzing
         s_tasks = [] # temporary container for tasks that are only suitable for symbolic testing
 
-        # Setup symbolic tasks, if required
-        if (not self.use_fuzzer) or self.use_flipper:
+        # Setup symbolic tasks, in any case
+        if True: #(not self.use_fuzzer) or self.use_flipper:
             # Only care about symbolic testing if we are not in fuzzing mode
             #   or if we are in flipper mode
 
@@ -318,6 +318,7 @@ class Macke:
                          % (len(f_tasks), len(self.callgraph.graph)))
             Logger.log("Fuzzer tasks: " + str(f_tasks) + "\n", verbosity_level="debug")
 
+        # Set up flipper tasks if needed
         if self.use_flipper:
             # Calculate intersection between the fuzzing tasks and the sym. testing tasks
             # For the intersection, run in flipper mode
