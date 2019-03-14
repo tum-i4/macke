@@ -189,7 +189,7 @@ def compute_klee_progress(path: str):
     shutil.rmtree(tmp_istats_dir)
     return klee_progress#(klee_progress, progress_done)
 
-SATURATION_CHECK_PERIOD = 12
+SATURATION_CHECK_PERIOD = 6
 def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger):
     saturated = False
     #progress_done = False
