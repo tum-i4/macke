@@ -216,6 +216,7 @@ class FuzzResult:
                        str(old_progress) + ")\n", verbosity_level="warning")
             self.progress = 0
 
+        self.convert_erros_to_klee_files(["queue", "crashes"])
         #self.find_errors(inputcorpus, crashcorpus)
 
 
