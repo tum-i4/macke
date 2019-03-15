@@ -21,8 +21,9 @@ def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, ou
     cgroup = cgroupqueue.get()
     try:
         result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
+        #result.convert_erros_to_klee_files(["queue", "crashes"])
         resultlist.append(result)
-        result.convert_erros_to_klee_files(["queue", "crashes"])
+        Logger.log("thead_fuzz_phase_one: resultlist: %s\n"%(str(resultlist)))
     except Exception as exc:
         print()
         print("A fuzz thread in phase one throws an exception")
