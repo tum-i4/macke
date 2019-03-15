@@ -278,7 +278,9 @@ def execute_klee(
 
     if analyzedfunc == "main":
         # the main function is handled a little bit differently
-        posixflags.extend(posix4main)
+        if posix4main:
+            posixflags.extend(posix4main)
+        Logger.log("Analyzing main. Adding %s to %s\n"%(str(posix4main), str(posixflags)), verbosity_level="debug")
     else:
         flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
@@ -347,8 +349,11 @@ def execute_klee(
     shutil.rmtree(tmpdir)
 
     # Store all the output in a textfile inside the klee directory
-    with open(path.join(outdir, "output.txt"), 'w') as file:
-        file.write(out)
+    try:
+        with open(path.join(outdir, "output.txt"), 'w') as file:
+            file.write(out)
+    except FileNotFoundError as fnf:
+        Logger.log("The output.txt file or directory %s was not found\n\tDumping KLEE output here %s\n"%(outdir, out), verbosity_level="error")
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags, progress)
@@ -365,4 +370,4 @@ def execute_klee_targeted_search(
     flags = [] if flags is None else flags
     flags = ["--search=sonar", "--sonar-target=function-call", "--sonar-target-info=" + targetfunc] + flags
     return execute_klee(
-        bcfile, analyzedfunc, outdir, False, flags, posixflags, posix4main, no_optimize)
+        bcfile, analyzedfunc, outdir, None, False, flags, posixflags, posix4main, no_optimize)
