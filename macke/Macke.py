@@ -565,7 +565,7 @@ class Macke:
             if self.use_flipper:
                 for (function, type) in run:
                     if type is self.FUZZ_ONLY:
-                        Logger.log("fuzzing path: " + self.fuzzdir + FUZZFUNCDIR_PREFIX + function + "\n", verbosity_level="debug")
+                        Logger.log("fuzzing path: " + path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function) + "\n", verbosity_level="debug")
 
                         Logger.log(str(function) + " -- fuzz only\n", verbosity_level="debug")
                         afl_outdir = path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function)
