@@ -278,13 +278,23 @@ def execute_klee(
 
     if analyzedfunc == "main":
         # the main function is handled a little bit differently
-        posixflags.extend(posix4main)
+        if posix4main:
+            posixflags.extend(posix4main)
+        Logger.log("Analyzing main. Adding %s to %s\n"%(str(posix4main), str(posixflags)), verbosity_level="debug")
     else:
         flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
+    
+    command = ([KLEEBIN, "--output-dir=" + outdir] + flags)
+    
+    # AFL->KTest conversion already done
+    # seed out dir should be added BEFORE the bc file and posixflags
+    if flipper_mode and os.path.isdir(afl_to_klee_dir):
+        if len(os.path.listdir(afl_to_klee_dir))>0:
+            command += [" -seed-out-dir=" + afl_to_klee_dir, "--named-seed-matching", "--zero-seed-extension", "--allow-seed-extension"]
+
     # Strange, but the posix flags must be append after bcfile
-    command = ([KLEEBIN, "--output-dir=" + outdir] + flags +
-               [bcfile] + posixflags)
+    command += [bcfile] + posixflags
 
     # Create a new, empty directory
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
@@ -295,8 +305,6 @@ def execute_klee(
 
     # actually run KLEE
     if flipper_mode:
-        # AFL->KTest conversion already done
-        command += " -seed-out-dir=" + afl_to_klee_dir
         # start running KLEE with total timeout
 
         # init klee progress
@@ -347,8 +355,11 @@ def execute_klee(
     shutil.rmtree(tmpdir)
 
     # Store all the output in a textfile inside the klee directory
-    with open(path.join(outdir, "output.txt"), 'w') as file:
-        file.write(out)
+    try:
+        with open(path.join(outdir, "output.txt"), 'w') as file:
+            file.write(out)
+    except FileNotFoundError as fnf:
+        Logger.log("The output.txt file or directory %s was not found\n\tDumping KLEE output here %s\n"%(outdir, out), verbosity_level="error")
 
     # Return a filled result container
     return KleeResult(bcfile, analyzedfunc, outdir, out, flags, progress)
