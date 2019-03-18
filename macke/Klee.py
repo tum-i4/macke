@@ -284,9 +284,16 @@ def execute_klee(
     else:
         flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
+    
+    command = ([KLEEBIN, "--output-dir=" + outdir] + flags)
+    
+    # AFL->KTest conversion already done
+    # seed out dir should be added BEFORE the bc file and posixflags
+    if flipper_mode:
+        command += [" -seed-out-dir=" + afl_to_klee_dir]
+
     # Strange, but the posix flags must be append after bcfile
-    command = ([KLEEBIN, "--output-dir=" + outdir] + flags +
-               [bcfile] + posixflags)
+    command += [bcfile] + posixflags
 
     # Create a new, empty directory
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
@@ -297,8 +304,6 @@ def execute_klee(
 
     # actually run KLEE
     if flipper_mode:
-        # AFL->KTest conversion already done
-        command += " -seed-out-dir=" + afl_to_klee_dir
         # start running KLEE with total timeout
 
         # init klee progress
