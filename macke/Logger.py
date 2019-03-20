@@ -78,7 +78,7 @@ class PlotDataLogger:
 
     def write_coverage(self):
         sorted_keys = sorted(self.coverage_list.keys())
-        Logger.log("Writing coverage in " + self.output_dir + "/coverage.log\n", verbosity_level="debug")
+        #Logger.log("Writing coverage in " + self.output_dir + "/coverage.log\n", verbosity_level="debug")
         coverage_file = open(os.path.join(self.output_dir, "coverage.log"), "a+")
         for s in sorted_keys:
             if s in self.written_coverage:
@@ -96,7 +96,7 @@ class PlotDataLogger:
         new_covered = []
 
         for line in coverage_file:
-            Logger.log("delta coverage line: " + line + "\n", verbosity_level="debug")
+            #Logger.log("delta coverage line: " + line + "\n", verbosity_level="debug")
             if line.startswith("#"):
                 continue
             fields = line.strip().split(", ")
@@ -109,7 +109,7 @@ class PlotDataLogger:
             #file_name = fields[2].split(self.PREFIXES[1])[-1]
             file_name = fields[2].strip()
             line_no = int(fields[4])
-            Logger.log("Logging fuzzer progress line " + line + "\n", verbosity_level="debug")
+            #Logger.log("Logging fuzzer progress line " + line + "\n", verbosity_level="debug")
 
             if not(any([ (("AFL", os.path.basename(file_name), line_no) in v or
                           ("KLEE", os.path.basename(file_name), line_no) in v) for v in self.coverage_list.values() ])):
@@ -132,13 +132,13 @@ class PlotDataLogger:
         os.system("cp " + os.path.join(os.path.join(self.klee_output_dir, "run.istats") + " " + tmp_istats_dir))
         covered = self.parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
 
-        Logger.log("log_klee_coverage: " + str(covered.keys()) + "\n", verbosity_level="debug")
+        #Logger.log("log_klee_coverage: " + str(covered.keys()) + "\n", verbosity_level="debug")
 
         for k in covered.keys():
             if not k:
                 #Logger.log("log_klee_coverage: covered keys contains None\n", verbosity_level="warning")
                 continue
-            Logger.log("klee covered " + k + "\n", verbosity_level="debug")
+            #Logger.log("klee covered " + k + "\n", verbosity_level="debug")
             file_name = os.path.basename(k)
             for src in covered[k].keys():
                 line_no = src
