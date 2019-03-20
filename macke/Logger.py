@@ -114,8 +114,8 @@ class PlotDataLogger:
             if not(any([ (("AFL", os.path.basename(file_name), line_no) in v or
                           ("KLEE", os.path.basename(file_name), line_no) in v) for v in self.coverage_list.values() ])):
                 new_covered.append(("AFL", os.path.basename(file_name), line_no))
-            else:
-                Logger.log(line + "already in " + str(self.coverage_list.values()) + "\n", verbosity_level="debug")
+            #else:
+            #    Logger.log(line + "already in " + str(self.coverage_list.values()) + "\n", verbosity_level="debug")
 
         self.coverage_list[time.time()] = new_covered
         self.write_coverage()
