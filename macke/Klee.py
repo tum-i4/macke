@@ -240,16 +240,6 @@ def execute_klee(
 
     progress = 0
 
-    '''
-    time_prefix = "--max-time="
-    # Get the timeout from the passed flags (hacky)
-    for f in flags:
-        if f.startswith(time_prefix):
-            # double the timeout for killing to be safe with time inprecisions
-            timeout = 2 * int(f[len(time_prefix):])
-            break
-    '''
-
     flags.extend(KLEEFLAGS)
     if no_optimize:
         flags.remove("--optimize")
@@ -260,8 +250,8 @@ def execute_klee(
         timeout = 3600
     else:
         if not flipper_mode:
-            flags.append("--stats-write-interval=" + str(timeout))
-            flags.append("--istats-write-interval=" + str(timeout))
+            flags.append("--stats-write-interval=" + str(timeout*2))
+            flags.append("--istats-write-interval=" + str(timeout*2))
         else: # flipper
             # set write-interval to the timeout / SATURATION_CHECK_PERIOD
             if timeout > SATURATION_CHECK_PERIOD:
@@ -292,6 +282,19 @@ def execute_klee(
     if flipper_mode and os.path.isdir(afl_to_klee_dir):
         if len(listdir(afl_to_klee_dir))>0:
             command += [" -seed-out-dir=" + afl_to_klee_dir, "--named-seed-matching", "--zero-seed-extension", "--allow-seed-extension"]
+    
+    # Use watchdog only if there's a max-time
+    if not flipper_mode:
+        time_prefix = "--max-time=" + str(timeout)
+        command += [time_prefix, "--watchdog"]
+        """
+        # Get the timeout from the passed flags (hacky)
+        for f in flags:
+            if f.startswith(time_prefix):
+                # double the timeout for killing to be safe with time inprecisions
+                timeout = 2 * int(f[len(time_prefix):])
+                break
+        """
 
     # Strange, but the posix flags must be append after bcfile
     command += [bcfile] + posixflags
@@ -332,8 +335,9 @@ def execute_klee(
             time.sleep(timeout)
 
         # klee saturated
-        killpg(getpgid(proc.pid), signal.SIGKILL)
-        retcode = proc.poll()
+        #killpg(getpgid(proc.pid), signal.SIGKILL)
+        proc.kill()
+        out = "\n--- kill(9)ed by MACKE for reaching saturation"
     else:
         try:
             out = _check_output(
