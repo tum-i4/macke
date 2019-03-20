@@ -290,7 +290,7 @@ def execute_klee(
     # AFL->KTest conversion already done
     # seed out dir should be added BEFORE the bc file and posixflags
     if flipper_mode and os.path.isdir(afl_to_klee_dir):
-        if len(os.path.listdir(afl_to_klee_dir))>0:
+        if len(listdir(afl_to_klee_dir))>0:
             command += [" -seed-out-dir=" + afl_to_klee_dir, "--named-seed-matching", "--zero-seed-extension", "--allow-seed-extension"]
 
     # Strange, but the posix flags must be append after bcfile
