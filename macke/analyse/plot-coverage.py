@@ -14,6 +14,7 @@ def split_coverage_into_slabs(time_ticks, coverage, switch_points, agents):
     init_coverage_slab = []
     init_time_slab = []
     
+    # init_time when analysis has not started yet
     for i, t in enumerate(time_ticks):
         if t>=switch_points[0]:
             dispatch_i = i
@@ -27,29 +28,29 @@ def split_coverage_into_slabs(time_ticks, coverage, switch_points, agents):
     time_i = dispatch_i
     switch_i = 0
 
-    cur_time_slab = [time_ticks[0]]
-    cur_coverage_slab = [coverage[0]]
+    cur_time_slab = [time_ticks[time_i-1], time_ticks[time_i]]
+    cur_coverage_slab = [coverage[time_i-1], coverage[time_i]]
 
     while time_i<len(time_ticks):
-        if switch_i>=(len(switch_points)-1):
+        if switch_i>=(len(switch_points)-1): # Passed all switch points
             cur_time_slab.append(time_ticks[time_i])
             cur_coverage_slab.append(coverage[time_i])
-        elif (time_ticks[time_i]>=switch_points[switch_i] and time_ticks[time_i]<switch_points[switch_i + 1]):
+        elif (time_ticks[time_i]>=switch_points[switch_i] and time_ticks[time_i]<switch_points[switch_i + 1]): # In between switch points
             cur_time_slab.append(time_ticks[time_i]) 
             cur_coverage_slab.append(coverage[time_i])
-        else:
+        else: # Passed a switch point
             print ("time_i: " + str(time_i))
-            print (time_ticks[time_i])
-            print (coverage[time_i])
-            print (agents[switch_i])
-            print ("")
-            cur_time_slab.append(time_ticks[time_i])
-            cur_coverage_slab.append(coverage[time_i])
+            #print (time_ticks[time_i])
+            #print (coverage[time_i])
+            #print (agents[switch_i])
+            #print ("")
+            #cur_time_slab.append(time_ticks[time_i])
+            #cur_coverage_slab.append(coverage[time_i])
             time_slabs.append(cur_time_slab)
             coverage_slabs.append(cur_coverage_slab)
             
-            cur_time_slab = [time_ticks[time_i]]
-            cur_coverage_slab = [coverage[time_i]]
+            cur_time_slab = [time_ticks[time_i-1], time_ticks[time_i]]
+            cur_coverage_slab = [coverage[time_i-1], coverage[time_i]]
             switch_i += 1
 
         time_i += 1
@@ -59,77 +60,71 @@ def split_coverage_into_slabs(time_ticks, coverage, switch_points, agents):
 
     return time_slabs, coverage_slabs
 
-def parse_switch_points(output_dir):
-    '''
-    switch_points, agents = [], []
-    log_file = open(os.path.join(output_dir, "jolf.log"), "r")
-
-    log_lines = log_file.readlines()
-    
-    line_ptr = 0
-    for i, l in enumerate(log_lines):
-        fields = l.strip().split("2018:")
-        if len(fields)==1:
-            continue
-        if fields[1].strip().startswith("Dispatch method"):
-            line_ptr = i
-            break
-
-    while line_ptr<len(log_lines):
-        fields = log_lines[line_ptr].strip().split("2018:")
-        if len(fields)==1:
-            line_ptr += 1
-            continue
-        if fields[1].strip().startswith("Calling AFL"):
-            switch_points.append(datetime.strptime(fields[0].strip()+" 2018", "%a %b %d %H:%M:%S %Y"))
-            agents.append("AFL")
-        if fields[1].strip().startswith("Calling KLEE"):
-            switch_points.append(datetime.strptime(fields[0].strip()+" 2018", "%a %b %d %H:%M:%S %Y"))
-            agents.append("KLEE")
-
-        line_ptr += 1
-
-    return switch_points, agents
-    '''
+def parse_switch_points(log_filename):
     switch_points, agents = [], []
     #print (output_dir)
-    log_file = open(os.path.join(output_dir, "coverage.log"), "r")
+    log_file = open(log_filename, "r")
     
     log_lines = log_file.readlines()
     was_klee = False
-    if log_lines:
-      fields = log_lines[0].split(',')
-      if fields[1].strip() != "KLEE":
-         print (fields[1].strip())
-         was_klee = True
+    was_afl = False
+    klee_running = False
+    afl_running = False
+
+    fields = log_lines[0].split(",")
+    
+    switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
+    
+    if fields[1].strip() == "KLEE":
+        klee_running = True
+        agents.append("KLEE")
+    elif fields[1].strip() == "AFL":
+        afl_running = True
+        agents.append("AFL")
+    else:
+        print("Unknown agent found: %s"%(fields[1].strip()))
+        return [], []
     
     for line in log_lines:
-      fields = line.split(',')
-      #print (fields)
-      if not was_klee:
-        #print (fields[1])
-        if fields[1].strip() == "KLEE":
-          was_klee = True
-          agents.append("KLEE")
-          switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
-      else: # was_klee
-        if fields[1].strip() == "AFL":
-          was_klee = False
-          agents.append("AFL")
-          switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
-    
+        fields = line.split(',')
+        #print (fields)
+        agent = fields[1].strip()
+        if agent=="KLEE" and afl_running:
+            afl_running = False
+            klee_running = True
+            agents.append("KLEE")
+            switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
+        if agent=="AFL" and klee_running:
+            klee_running = False
+            afl_running = True
+            agents.append("AFL")
+            switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
+        
+    """
+        if not was_klee:
+            #print (fields[1])
+            if fields[1].strip() == "KLEE":
+                was_klee = True
+                agents.append("KLEE")
+                switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
+        else: # was_klee
+            if fields[1].strip() == "AFL":
+                was_klee = False
+                agents.append("AFL")
+                switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))
     line = log_lines[len(log_lines)-1]
     fields = line.split(',')
     agents.append(fields[1].strip())
     switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))          
+    """
+    
     print (switch_points)
     print (agents)      
     return switch_points, agents
 
-def parse_coverage(output_dir, allowed_filenames):
-    coverage_file = os.path.join(output_dir, "coverage.log")
+def parse_coverage(coverage_file, allowed_filenames):
     if not os.path.isfile(coverage_file):
-        print("coverage.log file not found in that directory")
+        print("coverage content not found")
         return [], [], []
     
     times, lines, agents = [], [], []
@@ -153,9 +148,9 @@ def parse_coverage(output_dir, allowed_filenames):
     return times, lines, agents
 
 def group_lines_by_time(times):
-    start_time = times[0] - timedelta(minutes=5)
-    stop_time = start_time + timedelta(hours=1.2)
-    delta = timedelta(minutes=1)
+    start_time = times[0] - timedelta(seconds=15)
+    stop_time = start_time + timedelta(minutes=3)
+    delta = timedelta(seconds=1)
 
     cur_time = start_time
     i = 0
@@ -169,7 +164,8 @@ def group_lines_by_time(times):
             i += 1
             
         # Now flatten out the curve till the next set of increasing slope is found
-        coverage.append(coverage[-1])
+        last_coverage = coverage[-1]
+        coverage.append(last_coverage)
         cur_time += delta
         time_ticks.append(cur_time)
 
@@ -191,26 +187,30 @@ def get_allowed_filenames(allowed_list):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Time-wise coverage plotter")
-    parser.add_argument("-d", "--jolf-results-dir", help="Directory containing results from Jolf")
+    #parser.add_argument("-d", "--jolf-results-dir", help="Directory containing results from Jolf")
     parser.add_argument("-o", "--output-dir", help="Where to store the plots")
+    parser.add_argument("-c", "--coverage-file", help="File containing coverage")
 
     args = parser.parse_args()
 
     allowed_filenames = get_allowed_filenames(["/home/vintila/sources/*/*/*.c", "/home/vintila/sources/*/*/*.h"])
     #print(allowed_filenames)
 
-    times, lines, agents = parse_coverage(args.jolf_results_dir, allowed_filenames)
+    times, lines, agents = parse_coverage(args.coverage_file, allowed_filenames)
 
     time_ticks, coverage = group_lines_by_time(times)
-
-    switch_points, agents = parse_switch_points(args.jolf_results_dir)
+    """
+    for i, t in enumerate(time_ticks):
+        print(str(t) + ": " + str(coverage[i]))
+    """
+    switch_points, agents = parse_switch_points(args.coverage_file)
 
     time_slabs, coverage_slabs = split_coverage_into_slabs(time_ticks, coverage, switch_points, agents)
-    print ("Agents: " + str(len(agents)) + " - " + str(agents))
-    print ("Time slabs: " + str(len(time_slabs)) + " - " + str(time_slabs))
-    print ("Cov slabs: " + str(len(coverage_slabs)) + " - " + str(coverage_slabs))
+    #print ("Agents: " + str(len(agents)) + " - " + str(agents))
+    #print ("Time slabs: " + str(len(time_slabs)) + " - " + str(time_slabs))
+    #print ("Cov slabs: " + str(len(coverage_slabs)) + " - " + str(coverage_slabs))
     
-    agents = ["KLEE"] + agents
+    agents = [agents[0]] + agents
 
     fig, ax = plt.subplots()
 
@@ -228,7 +228,7 @@ if __name__=="__main__":
         
     #legend = ax.legend(loc='upper right')
 
-    plot_name = os.path.basename(args.jolf_results_dir) + ".png"
+    plot_name = os.path.basename(args.coverage_file) + ".png"
     plt.savefig(os.path.join(args.output_dir, plot_name))
     
     print (args.output_dir + "/" + plot_name)
