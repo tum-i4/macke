@@ -25,13 +25,12 @@ def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, ou
         resultlist.append(result)
         Logger.log("thead_fuzz_phase_one: resultlist: %s\n"%(str(resultlist)))
     except Exception as exc:
-        print()
-        print("A fuzz thread in phase one throws an exception")
-        print("The analyzed function was:", functionname)
-        print(exc)
-        print()
-        print(sys.exc_info())
-        traceback.print_tb(sys.exc_info()[2])
+        Logger.log("A fuzz thread in phase one threw an exception\n", verbosity_level="error")
+        Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
+        Logger.log(exc + "\n", verbosity_level="error")
+        Logger.log(sys.exc_info() + "\n", verbosity_level="error")
+        Logger.log(str(traceback.format_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
+
     cgroupqueue.put(cgroup)
 
     Logger.log("done thread_fuzz_phase_one: " + functionname + "\n", verbosity_level="debug")
@@ -84,13 +83,11 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                     no_optimize, afl_to_klee_dir, plot_data_logger)
             # pylint: disable=broad-except
             except Exception as exc:
-                print()
-                print("A thread in phase one threw an exception")
-                print("The analyzed function was:", functionname)
-                print(exc)
-                print()
-                print(sys.exc_info())
-                traceback.print_tb(sys.exc_info()[2])
+                Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
+                Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
+                Logger.log(exc + "\n", verbosity_level="error")
+                Logger.log(sys.exc_info() + "\n", verbosity_level="error")
+                Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
 
             # Translate klee files to fuzz files
 
@@ -169,13 +166,11 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                                             posixflags, posix4main, no_optimize)
             # pylint: disable=broad-except
             except Exception as exc:
-                print()
-                print("A thread in phase one threw an exception")
-                print("The analyzed function was:", functionname)
-                print(exc)
-                print()
-                print(sys.exc_info())
-                traceback.print_tb(sys.exc_info()[2])
+                Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
+                Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
+                Logger.log(exc + "\n", verbosity_level="error")
+                Logger.log(sys.exc_info() + "\n", verbosity_level="error")
+                Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
 
     resultlist.append(klee_result)
     Logger.log("done thread_flipper_phase_one on : " + functionname + " (flipped " + str(flip_counter) + " times)\n", verbosity_level="debug")
@@ -194,13 +189,12 @@ def thread_phase_one(
             symmains_bc, functionname, outdir, timeout, flipper_mode, flags, posixflags, posix4main, no_optimize))
     # pylint: disable=broad-except
     except Exception as exc:
-        print()
-        print("A thread in phase one threw an exception")
-        print("The analyzed function was:", functionname)
-        print(exc)
-        print()
-        print(sys.exc_info())
-        traceback.print_tb(sys.exc_info()[2])
+        Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
+        Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
+        Logger.log(exc + "\n", verbosity_level="error")
+        Logger.log(sys.exc_info() + "\n", verbosity_level="error")
+        Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
+
     Logger.log("done thread_phase_one: " + functionname + "\n", verbosity_level="debug")
 
 

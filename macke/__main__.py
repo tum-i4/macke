@@ -161,16 +161,6 @@ def main():
     parser.set_defaults(log_flipping=False)
 
     parser.add_argument(
-        '--cov-executable',
-        help="Executable file, that will be used for coverage tracking"
-    )
-
-    parser.add_argument(
-        '--cov-sources',
-        help="Source dir, that will be used for coverage tracking"
-    )
-
-    parser.add_argument(
         '--use-fuzzer',
         type=str2bool,
         default=False,
@@ -311,7 +301,7 @@ def main():
                   exclude_known_from_phase_two=args.exclude_known, max_klee_time=args.max_klee_time, use_flipper=args.flipper, max_flipper_time=args.max_flipper_time,
                   use_fuzzer=args.use_fuzzer, max_fuzz_time=args.max_fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
                   generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize,
-                  flip_logging_desired=args.log_flipping, cov_executable=args.cov_executable, cov_source=args.cov_sources)
+                  flip_logging_desired=args.log_flipping)
     macke.run_complete_analysis()
 
     Logger.close()

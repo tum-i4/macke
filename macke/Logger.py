@@ -88,6 +88,20 @@ class PlotDataLogger:
             self.written_coverage.append(s)
         coverage_file.close()
 
+    def log_fuzzer_progress(self, coverage: dict):
+        #Logger.log ("Logging fuzzer progress: " + str(coverage) + "\n", verbosity_level="debug")
+        new_covered = []
+
+        for filename in coverage:
+            for line_no in coverage[filename]["covered"]:
+                new_covered.append(("AFL", os.path.basename(filename), line_no))
+
+        Logger.log("New covered: " + str(new_covered) + "\n", verbosity_level="debug")
+
+        self.coverage_list[time.time()] = new_covered
+        self.write_coverage()
+
+    '''
     def log_fuzzer_progress(self):
         if not os.path.exists(os.path.join(self.fuzzer_output_dir, "cov/id-delta-cov")):
             return []
@@ -119,7 +133,7 @@ class PlotDataLogger:
 
         self.coverage_list[time.time()] = new_covered
         self.write_coverage()
-
+    '''
     def log_klee_coverage(self):
         new_covered = []
 

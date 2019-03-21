@@ -9,6 +9,7 @@ import os
 import subprocess
 import signal
 
+from .Logger import Logger
 
 try:
     from .config import VALGRIND
@@ -120,7 +121,7 @@ def parse_coverage(cov_file):
 
 
 def get_coverage(args, inputfile, timeout=1, fileinput=False, tmpfilename=None):
-    if not tmpfilename==None:
+    if tmpfilename==None:
         fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
     else:
         fd = os.open(tmpfilename, "w")
@@ -130,6 +131,8 @@ def get_coverage(args, inputfile, timeout=1, fileinput=False, tmpfilename=None):
     else:
         infd = None
         args.append(inputfile)
+    Logger.log("get_coverage: " + str([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename]) +
+               str(args) + "\n", verbosity_level="debug")
     p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
     output = b""
     err = b""

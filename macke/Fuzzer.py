@@ -141,7 +141,7 @@ def get_files_from_dir(dir: str):
     files = []
 
     if not os.path.exists(dir):
-        Logger.log("get_files_from_dir: " + dir + " does not exits! Defaulting return value to [].",
+        Logger.log("get_files_from_dir: " + dir + " does not exits! Defaulting return value to [].\n",
                    verbosity_level="warning")
         return []
 
@@ -319,7 +319,7 @@ class FuzzManager:
     Manages relevant global resources for fuzzing and
     """
     def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True,
-                 input_maxlen=32, print_func=print, cov_executable=None, cov_source=None):
+                 input_maxlen=32, print_func=print):
         """
         Compile necessary binaries and save the names to them
         """
@@ -405,12 +405,6 @@ class FuzzManager:
         # saturation computation
         self.already_processed_lines = 1
         self.saturation_index = 0
-
-        # flip logging
-        Logger.log("flip logging: cov_executable " + str(cov_executable) + "\n", verbosity_level="debug")
-        Logger.log("flip logging: cov_source " + str(cov_source) + "\n", verbosity_level="debug")
-        self.cov_executable = cov_executable
-        self.cov_source = cov_source
 
 
     def init_inputdirs(self):
@@ -514,39 +508,61 @@ class FuzzManager:
 
         return saturated
 
-    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool, plot_data_logger):
+    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool, plot_data_logger,
+                                     funcname: str):
         # Depending on flipper, either time.sleep or time.sleep till afl_saturates
 
         Logger.log("waiting for stopping conditions for outdir " +
                    outdir + " and fuzztime " + str(fuzztime) + "\n", verbosity_level="debug")
 
-        if not flipper_mode:
-            Logger.log("non flipper mode -> just sleep\n", verbosity_level="debug")
-            time.sleep(fuzztime)
-            Logger.log("checking if " + os.path.join(os.path.join(outdir, "plot_data")) + " exists: " +
-                       str(os.path.exists(os.path.join(os.path.join(outdir, "plot_data")))) + "\n",
-                       verbosity_level="debug")
-        else:
-            # TODO: add a loop (with sleep of saturation check period) to log progress
-            # TODO: use get_fuzzer in the same thread to keep track of old progress and new_progress
-            SATURATION_CHECK_PERIOD = 6 # default afl PLOT_UPDATE_SEC value
-            for i in range(0, int(fuzztime/SATURATION_CHECK_PERIOD)):
-                time.sleep(SATURATION_CHECK_PERIOD)
-                if plot_data_logger:
-                    plot_data_logger.log_fuzzer_progress()
-                else:
-                    Logger.log("test manu: plot_data_logger not set\n", verbosity_level="debug") # TODO: remove
-                if self.afl_saturated(outdir):
-                    Logger.log("saturation detected\n", verbosity_level="debug")
-                    break
-            # sleep remaining time (if any)
-            time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
-            if plot_data_logger:
-                plot_data_logger.log_fuzzer_progress()
+        if flipper_mode:
+            Logger.log("Flipper mode: wait for saturation or timeout\n", verbosity_level="debug")
 
+        if plot_data_logger:
+            processed_files = []
+            inputcorpus = path.join(outdir, "queue")
+            crashcorpus = path.join(outdir, "crashes")
+            hangcorpus = path.join(outdir, "hangs")
+
+            inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
+            args = [self.afltarget, "--fuzz-driver=" + funcname]
+
+
+        SATURATION_CHECK_PERIOD = 6  # default afl PLOT_UPDATE_SEC value
+        for i in range(0, int(fuzztime / SATURATION_CHECK_PERIOD)):
+            time.sleep(SATURATION_CHECK_PERIOD)
+            if plot_data_logger:
+                for d in inputdirectories:
+                    current_files = get_files_from_dir(d)
+                    for file in current_files:
+                        if not (file in processed_files): # TODO: adapt this to not do linear search in list
+                            Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                            covered = get_coverage(args, file)
+                            plot_data_logger.log_fuzzer_progress(covered)
+                            processed_files.append(file)
+                        else:
+                            Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+            if flipper_mode and self.afl_saturated(outdir): # only check saturation when in flipper_mode
+                Logger.log("saturation detected\n", verbosity_level="debug")
+                break
+        # sleep remaining time (if any)
+        time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
+        if plot_data_logger:
+            for d in inputdirectories:
+                current_files = get_files_from_dir(d)
+                for file in current_files:
+                    if not (file in processed_files):  # TODO: adapt this to not do linear search in list
+                        Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                        covered = get_coverage(args, file)
+                        plot_data_logger.log_fuzzer_progress(covered)
+                        processed_files.append(file)
+                    else:
+                        Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+
+        if flipper_mode:
             # saturation reached
-            if not resume:
-                self.already_processed_lines = 1 # first line is text, so not interesting -> initial value 1
+            if not resume or not os.path.exists(os.path.join(outdir, "plot_data")):
+                self.already_processed_lines = 1  # first line is text, so not interesting -> initial value 1
             else:
                 with open(os.path.join(os.path.join(outdir, "plot_data")), "r") as plot_data:
                     lines = plot_data.readlines()
@@ -554,27 +570,6 @@ class FuzzManager:
                     Logger.log("resuming fuzzer with already_processed_lines = " + str(self.already_processed_lines)
                                + "\n", verbosity_level="debug")
             self.saturation_index = 0
-
-    def call_afl_cov(self, afl_output_dir, coverage_executable, afl_command_args, coverage_source, live=False):
-        Logger.log("Attempting to call afl-cov: %s %s %s" % (afl_output_dir, coverage_executable, coverage_source) +
-                   "\n", verbosity_level="debug")
-        if live:
-            live_arg = "--live --background --quiet --sleep 2"
-        else:
-            live_arg = ""
-        ret = os.system(
-            "afl-cov -d %s %s --coverage-cmd \"%s %s AFL_FILE\" --code-dir %s --coverage-include-lines" % (
-            afl_output_dir, live_arg, coverage_executable, afl_command_args, coverage_source))
-
-        if ret == 0:
-            Logger.log("Dispatching afl-cov was successful\n\t%s" % (afl_output_dir) + "\n", verbosity_level="debug")
-        else:
-            Logger.log(
-            "afl-cov -d %s %s --coverage-cmd \"%s %s AFL_FILE\" --code-dir %s --coverage-include-lines" % (
-            afl_output_dir, live_arg, coverage_executable, afl_command_args, coverage_source), verbosity_level="debug")
-            Logger.log("FAILED to dispatch afl-cov\n\treturn value: %d" % (ret) + "\n", verbosity_level="debug")
-
-        return ret
 
     def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool, afl_to_klee_dir: str,
                          plot_data_logger=None):
@@ -587,21 +582,14 @@ class FuzzManager:
             Logger.log(afl_to_klee_dir + " already exists. Flipper iteration?\n", verbosity_level="debug")
             old_progress = compute_fuzz_progress(outdir)
             Logger.log("old_progress: " + str(old_progress) + "\n", verbosity_level="debug")
-            resume = True
+            resume_path = os.path.join(outdir, "_resume")
+            if os.path.exists(resume_path) and (len(listdir(resume_path)) > 0):
+                resume = True
+            else:
+                Logger.log("Not resuming because " + outdir + "/_resume is empty!\n", verbosity_level="warning")
 
 
         outfd = open(path.join(outdir, "output.txt"), "w")
-
-        # Optional: Run parallel afl_cov to gather coverage stats
-        # TODO: this can be changed to use get_coverage function from callgrind instead, using following arguments -
-        #   args = [afltarget, "--fuzz-driver=" + analyzedfunc]
-        #   get_coverage(args, inputfilename)
-        if plot_data_logger:
-            if self.cov_source and self.cov_executable:
-                self.call_afl_cov(outdir, self.cov_executable, " ", self.cov_source, True)
-            else:
-                Logger.log("Cannot log plot data because the coverage sources or executable are missing",
-                           verbosity_level="warning")
 
         if resume:
             proc = cgroups_Popen([AFLFUZZ, "-i-", "-o", outdir, "-m", "none",
@@ -621,7 +609,7 @@ class FuzzManager:
         Logger.log("outdir " + outdir + "\n", verbosity_level="debug")
 
         # Run saturation check
-        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume, plot_data_logger)
+        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume, plot_data_logger, functionname)
         Logger.log("AFL saturated\n", verbosity_level="debug")
 
         try:
@@ -644,7 +632,7 @@ class FuzzManager:
         except subprocess.CalledProcessError as ex:
             pass
 
-        return FuzzResult(self, cgroup, functionname, afl_to_klee_dir, outdir, old_progress);
+        return FuzzResult(self, cgroup, functionname, afl_to_klee_dir, outdir, old_progress)
 
 
     def execute_afl_tmin(self, cgroup, inputfile, outputfile, functionname):
@@ -681,4 +669,4 @@ class FuzzManager:
 
         out = _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
-            "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile]);
+            "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile])

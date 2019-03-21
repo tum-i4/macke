@@ -59,8 +59,7 @@ class Macke:
                  use_flipper=False, max_flipper_time=30, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  max_fuzz_time=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
-                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False,
-                 flip_logging_desired=False, cov_executable=None, cov_source=None):
+                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False, flip_logging_desired=False):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -143,9 +142,6 @@ class Macke:
         self.use_flipper = use_flipper
         self.max_flipper_time = max_flipper_time
         self.flip_logging_desired = flip_logging_desired
-        # Setting the flip logging
-        self.cov_executable = cov_executable
-        self.cov_source = cov_source
 
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
@@ -250,7 +246,7 @@ class Macke:
 
             self.fuzz_manager = FuzzManager(self.fuzz_program_bc, self.fuzzdir, builddir, self.fuzz_lflags, None,
                                             self.fuzz_stop_when_done, self.fuzz_smartinput, self.fuzz_input_maxlen,
-                                            self.qprint, self.cov_executable, self.cov_source)
+                                            self.qprint)
 
         # Print some information for the user
         self.qprint(
