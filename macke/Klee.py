@@ -189,7 +189,7 @@ def compute_klee_progress(path: str):
     shutil.rmtree(tmp_istats_dir)
     return klee_progress#(klee_progress, progress_done)
 
-SATURATION_CHECK_PERIOD = 6
+SATURATION_CHECK_PERIOD = 12
 def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger):
     saturated = False
     #progress_done = False
@@ -280,7 +280,7 @@ def execute_klee(
     # AFL->KTest conversion already done
     # seed out dir should be added BEFORE the bc file and posixflags
     if flipper_mode and os.path.isdir(afl_to_klee_dir):
-        if len(os.listdir(afl_to_klee_dir))>0:
+        if len(listdir(afl_to_klee_dir))>0:
             command += [" -seed-out-dir=" + afl_to_klee_dir, "--named-seed-matching", "--zero-seed-extension", "--allow-seed-extension"]
     
     # Use watchdog only if there's a max-time
