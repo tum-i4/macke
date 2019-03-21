@@ -265,7 +265,7 @@ def main():
 
     # Compose KLEE flags given directly by the user
     flags_user = [
-        "--max-time=%d" % args.max_klee_time,
+        #"--max-time=%d" % args.max_klee_time,
         "--max-instruction-time=%d" % args.max_klee_instruction_time
     ]
 

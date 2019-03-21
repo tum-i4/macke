@@ -154,7 +154,7 @@ class Macke:
             options = OrderedDict()
 
             options["exclude_known"] = self.exclude_known_from_phase_two
-            options["klee-max-time"] = int(next(filter(lambda f : f.startswith("--max-time="), self.flags_user))[len("--max-time="):])
+            options["klee-max-time"] = self.max_klee_time #int(next(filter(lambda f : f.startswith("--max-time="), self.flags_user))[len("--max-time="):])
             options["use_fuzzer"] = self.use_fuzzer
             options["use_flipper"] = self.use_flipper
             if self.use_fuzzer:
