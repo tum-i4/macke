@@ -527,6 +527,8 @@ class FuzzManager:
                        str(os.path.exists(os.path.join(os.path.join(outdir, "plot_data")))) + "\n",
                        verbosity_level="debug")
         else:
+            # TODO: add a loop (with sleep of saturation check period) to log progress
+            # TODO: use get_fuzzer in the same thread to keep track of old progress and new_progress
             SATURATION_CHECK_PERIOD = 6 # default afl PLOT_UPDATE_SEC value
             for i in range(0, int(fuzztime/SATURATION_CHECK_PERIOD)):
                 time.sleep(SATURATION_CHECK_PERIOD)
@@ -591,7 +593,9 @@ class FuzzManager:
         outfd = open(path.join(outdir, "output.txt"), "w")
 
         # Optional: Run parallel afl_cov to gather coverage stats
-
+        # TODO: this can be changed to use get_coverage function from callgrind instead, using following arguments -
+        #   args = [afltarget, "--fuzz-driver=" + analyzedfunc]
+        #   get_coverage(args, inputfilename)
         if plot_data_logger:
             if self.cov_source and self.cov_executable:
                 self.call_afl_cov(outdir, self.cov_executable, " ", self.cov_source, True)
