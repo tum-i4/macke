@@ -127,7 +127,11 @@ def get_coverage(args, inputfile, timeout=1, fileinput=False, tmpfilename=None):
         fd = os.open(tmpfilename, "w")
     os.close(fd)
     if not fileinput:
-        infd = open(inputfile, "r")
+        try:
+            infd = open(inputfile, "r")
+        except FileNotFoundError:
+            Logger.log("get_coverage: input file " + inputfile + " not found!\n", verbosity_level="error")
+            return dict()
     else:
         infd = None
         args.append(inputfile)
