@@ -96,7 +96,7 @@ class PlotDataLogger:
             for line_no in coverage[filename]["covered"]:
                 new_covered.append(("AFL", os.path.basename(filename), line_no))
 
-        Logger.log("New covered: " + str(new_covered) + "\n", verbosity_level="debug")
+        #Logger.log("New covered: " + str(new_covered) + "\n", verbosity_level="debug")
 
         self.coverage_list[time.time()] = new_covered
         self.write_coverage()

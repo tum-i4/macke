@@ -153,19 +153,19 @@ def get_files_from_dir(dir: str):
             if f.startswith("id:"):
                 if (path.join(dir, f) in files) or (path.join(dir, "min_" + f) in files):
                     # skip
-                    Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
-                               verbosity_level="debug")
+                    #Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
+                    #           verbosity_level="debug")
                     continue
                 else:
                     files.append(path.join(dir, f))
             elif f.startswith("min_id:"):
                 if path.join(dir, f) in files:
-                    Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
-                               verbosity_level="debug")
+                    #Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
+                    #           verbosity_level="debug")
                     continue  # skip it
                 elif path.join(dir, f[3:]) in files:
-                    Logger.log("get_files_from_dir: removing " + f[3:] + " because " + f + " is already in the list\n",
-                               verbosity_level="debug")
+                    #Logger.log("get_files_from_dir: removing " + f[3:] + " because " + f + " is already in the list\n",
+                    #           verbosity_level="debug")
                     files.remove(path.join(dir, f[3:]))
                 files.append(path.join(dir, f))
     return files
@@ -235,7 +235,7 @@ class FuzzResult:
             for f in files:
                 cnt += 1
                 #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
-                Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
+                #Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
                 """
                 Creates a file <testname>.ktest and <testname>.ktest.err in directory
                 Returns the name of the errfile
@@ -244,7 +244,7 @@ class FuzzResult:
                 ktestname = path.join(self.outdir, errname + ".ktest")
 
                 if os.path.exists(ktestname):
-                    Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
+                    #Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
                     continue
 
                 if kleeargs is None:
@@ -536,12 +536,12 @@ class FuzzManager:
                     current_files = get_files_from_dir(d)
                     for file in current_files:
                         if not (file in processed_files): # TODO: adapt this to not do linear search in list
-                            Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                            #Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
                             covered = get_coverage(args, file)
                             plot_data_logger.log_fuzzer_progress(covered)
                             processed_files.append(file)
-                        else:
-                            Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+                        #else:
+                        #    Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
             if flipper_mode and self.afl_saturated(outdir): # only check saturation when in flipper_mode
                 Logger.log("saturation detected\n", verbosity_level="debug")
                 break
@@ -552,12 +552,12 @@ class FuzzManager:
                 current_files = get_files_from_dir(d)
                 for file in current_files:
                     if not (file in processed_files):  # TODO: adapt this to not do linear search in list
-                        Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                        #Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
                         covered = get_coverage(args, file)
                         plot_data_logger.log_fuzzer_progress(covered)
                         processed_files.append(file)
-                    else:
-                        Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+                    #else:
+                    #    Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
 
         if flipper_mode:
             # saturation reached
