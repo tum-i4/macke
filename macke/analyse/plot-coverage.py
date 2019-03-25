@@ -194,6 +194,7 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     allowed_filenames = get_allowed_filenames(["/home/vintila/sources/*/*/*.c", "/home/vintila/sources/*/*/*.h"])
+    allowed_filenames.append(get_allowed_filenames(["/home/vintila/sources/*/*.c", "/home/vintila/sources/*/*.h"]))
     #print(allowed_filenames)
 
     times, lines, agents = parse_coverage(args.coverage_file, allowed_filenames)
@@ -228,7 +229,7 @@ if __name__=="__main__":
         
     #legend = ax.legend(loc='upper right')
 
-    plot_name = os.path.basename(args.coverage_file) + ".png"
+    plot_name = os.path.basename(os.path.dirname(args.coverage_file)) + ".png"
     plt.savefig(os.path.join(args.output_dir, plot_name))
     
     print (args.output_dir + "/" + plot_name)
