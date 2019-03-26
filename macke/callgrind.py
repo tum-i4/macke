@@ -87,7 +87,11 @@ def parse_coverage(cov_file):
             elif pm == "ob" or pm == "cob":
                 pass
             else:
-                parse_name(line[len(pm) + 1:], fn_mapping)
+                try:
+                    currentfile = parse_name(line[len(pm) + 1:], fn_mapping)
+                except AssertionError as ae:
+                    print("Could not parse name: %s"%(line[3:]))
+                    currentfile = ""
 
         # Start with number
         elif '0' <= line[0] <= '9':
