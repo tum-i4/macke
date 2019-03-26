@@ -153,6 +153,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
     if fuzz_result:
         fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
 
+    """
     if not timeout_detected:
         # flipping terminated due to lack of progress
         # run KLEE for the remaining time
@@ -172,7 +173,7 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                 Logger.log(exc + "\n", verbosity_level="error")
                 Logger.log(sys.exc_info() + "\n", verbosity_level="error")
                 Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
-
+    """
     resultlist.append(klee_result)
     Logger.log("done thread_flipper_phase_one on : " + functionname + " (flipped " + str(flip_counter) + " times)\n", verbosity_level="debug")
 
