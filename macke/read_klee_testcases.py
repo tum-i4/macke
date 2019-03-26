@@ -250,16 +250,21 @@ def write_args_to_file(testname, objects, out_folder):
     '''
     if not os.path.isdir(out_folder):
         os.system("mkdir %s" % (out_folder))
-    testcase = open("%s/%s.txt" % (out_folder, testname), "w")
+    testcase = open("%s/%s.txt" % (out_folder, testname), "wb") # b because we are writing raw bytes to the file
 
     Logger.log("write_args_to_file: opened " + out_folder + "/" + testname + ".txt\n", verbosity_level="debug")
-    arg_string = ""
+    arg_string = b""
     for o in objects:
-        arg_string += o + "\xFA" #o[2] + " "
+        if not o:
+            continue
+        o_bytes = bytearray(o, "utf-8") # original o may be a mixture of ascii and bytes. Convert everything to bytes
+        #Logger.log("write_args_to_file: adding to arg_string %s: %s\n"%(arg_string, o), verbosity_level="debug")
+        arg_string += o_bytes + b'\xfa' #o[2] + " "
     #Logger.log("write_args_to_file: " + str(arg_string) + "\n", verbosity_level="debug")
-    if arg_string != "":
-        arg_string += "\n"
+    if arg_string != b"":
+        arg_string += b"\n"
         testcase.write(arg_string)
+    testcase.close()
 
 def write_testcase_file(testname, objects, out_folder):
     command_args_objects = []

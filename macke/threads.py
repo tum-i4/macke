@@ -101,8 +101,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                     #    argv.extend(process_klee_out(k, fuzzmanager.inputbasedir + "/input"))
                     try:
                         process_klee_out(klee_outdir, fuzzmanager.inputforfunc[functionname])
-                    except:
-                        Logger.log("Unexpected error while processing klee output!\n", verbosity_level="error")
+                    except Exception as e:
+                        Logger.log("Unexpected error while processing klee output: %s\n"%(e), verbosity_level="error")
                         #sys.exit(1)
                     # argv = self.clean_argv(argv)
                     #Logger.log("argv: " + str(argv) + "\n", verbosity_level="debug")

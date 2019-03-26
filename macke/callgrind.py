@@ -75,7 +75,11 @@ def parse_coverage(cov_file):
             pm = line[0:line.index('=')]
 
             if pm == "fl" or pm == "fi" or pm == "fe":
-                currentfile = parse_name(line[3:], fl_mapping)
+                try:
+                    currentfile = parse_name(line[3:], fl_mapping)
+                except AssertionError as ae:
+                    print("Could not parse name: %s"%(line[3:]))
+                    currentfile = ""
                 if currentfile != "" and currentfile != "???" and currentfile not in extract:
                     extract[currentfile] = {'covered': set(), 'uncovered': set()}
             elif pm == "cfl" or pm == "cfi":
@@ -116,7 +120,9 @@ def parse_coverage(cov_file):
         elif line.startswith("totals:"):
             pass
         else:
-            raise ValueError("Invalid line %s" % line)
+            print("Invalid line %s\nSkipping." % line)
+            pass
+            #raise ValueError("Invalid line %s" % line)
     return extract
 
 

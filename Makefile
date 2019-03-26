@@ -12,7 +12,7 @@ help:
 
 .PHONY: dev
 dev: venv
-	.venv/bin/pip install --editable .
+	.venv/bin/python3 -m pip install --editable .
 	@ echo "Everything is set up for development."
 	@ echo "Please switch with 'source .venv/bin/activate'"
 
@@ -25,12 +25,12 @@ test: venv examples/chain.bc examples/divisible.bc examples/doomcircle.bc \
 
 # Initialize the virtual environment, if needed
 .venv:
-	python3 -m venv .venv
-	.venv/bin/pip install --upgrade pip
+	python3 -m venv .venv --without-pip --system-site-packages
+	.venv/bin/python3 -m pip install --upgrade pip
 
 # Install and keep in sync with the requirements
 .venv/bin/activate: requirements.txt .venv
-	.venv/bin/pip install -Ur requirements.txt
+	.venv/bin/python3 -m pip install -Ur requirements.txt
 	touch .venv/bin/activate
 
 .PHONY: venv
