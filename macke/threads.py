@@ -150,7 +150,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             Logger.log("Timeout detected\n", verbosity_level="debug")
             timeout_detected = True
 
-    fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
+    if fuzz_result:
+        fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
 
     if not timeout_detected:
         # flipping terminated due to lack of progress
