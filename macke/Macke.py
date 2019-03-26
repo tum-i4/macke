@@ -633,7 +633,7 @@ class Macke:
                         self.get_next_klee_directory(
                             dict(phase=phase, bcfile=prepended_bcfile,
                                  caller=caller, callee=callee)),
-                        self.flags_user, self.posixflags, self.posix4main, self.no_optimize
+                        self.max_klee_time, self.flags_user, self.posixflags, self.posix4main, self.no_optimize
                     ))
                 else:
                     skipped += 1

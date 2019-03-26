@@ -201,7 +201,7 @@ def thread_phase_one(
 
 def thread_phase_two(
         resultlist, caller, callee, prepended_bc, outdir,
-        flags, posixflags, posix4main, no_optimize=False):
+        klee_time, flags, posixflags, posix4main, no_optimize=False):
     """
     This function is executed by the parallel processes in phase two
     """
@@ -211,7 +211,7 @@ def thread_phase_two(
     try:
         resultlist.append(execute_klee_targeted_search(
             prepended_bc, caller, "__macke_error_" + callee, outdir,
-            flags, posixflags, posix4main, no_optimize))
+            klee_time, flags, posixflags, posix4main, no_optimize))
     # pylint: disable=broad-except
     except Exception as exc:
         print()
