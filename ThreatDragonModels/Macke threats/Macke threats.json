@@ -5,7 +5,13 @@
   },
   "detail": {
     "contributors": [],
-    "diagrams": [],
+    "diagrams": [
+      {
+        "title": "first-model",
+        "thumbnail": "./public/content/images/thumbnail.jpg",
+        "id": 0
+      }
+    ],
     "reviewer": "saahil"
   }
 }
