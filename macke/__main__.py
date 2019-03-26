@@ -293,7 +293,7 @@ def main():
     
     fuzzbc = args.fuzz_bc.name if args.fuzz_bc is not None else None
 
-    Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
+    #Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
