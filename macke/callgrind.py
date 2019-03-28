@@ -101,6 +101,8 @@ def parse_coverage(cov_file):
             if loc != 0 and currentfile != "" and currentfile != "???":
                 assert int(cols[1]) != 0
                 # This line was covered
+                if not (currentfile in extract):
+                  extract[currentfile] = {'covered': set(), 'uncovered': set()}
                 extract[currentfile]['covered'].add(loc)
             currentline = loc
         # Subposition compression
@@ -111,6 +113,8 @@ def parse_coverage(cov_file):
             if loc != 0 and currentfile != "" and currentfile != "???":
                 assert int(cols[1]) != 0
                 # This line was covered
+                if not (currentfile in extract):
+                  extract[currentfile] = {'covered': set(), 'uncovered': set()}
                 extract[currentfile]['covered'].add(loc)
             currentline = loc
         # means cost on same line, thus nothing new is covered
