@@ -616,7 +616,9 @@ class FuzzManager:
             kill(proc.pid, signal.SIGINT)
             # wait for afl-fuzz to cleanup
             proc.wait()
+            Logger.log("AFL killed!\n", verbosity_level="debug")
         except OSError:
+            Logger.log("Error killing AFL (1)", verbosity_level="error")
             pass
         outfd.close()
 
@@ -628,6 +630,7 @@ class FuzzManager:
                 try:
                     kill(int(pid), signal.SIGKILL)
                 except OSError:
+                    Logger.log("Error killing AFL (2)", verbosity_level="error")
                     pass
         except subprocess.CalledProcessError as ex:
             pass
