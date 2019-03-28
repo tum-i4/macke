@@ -23,7 +23,6 @@ def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, ou
         result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
         #result.convert_erros_to_klee_files(["queue", "crashes"])
         resultlist.append(result)
-        Logger.log("thead_fuzz_phase_one: resultlist: %s\n"%(str(resultlist)))
     except Exception as exc:
         Logger.log("A fuzz thread in phase one threw an exception\n", verbosity_level="error")
         Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
@@ -119,11 +118,11 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             flip_counter += 1
             Logger.log("Flipping!\n", verbosity_level="debug")
             # Run fuzzer
-            Logger.log("trying afl on: " + functionname + "\n", verbosity_level="debug")
 
             cgroup = cgroupqueue.get()
             try:
                 afl_time = min([fuzztime, time_remaining])
+                Logger.log("trying afl on: " + functionname + " for " + str(afl_time) + "\n", verbosity_level="debug")
                 fuzz_result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, afl_time, flipper_mode,
                                                            afl_to_klee_dir, plot_data_logger)
 
@@ -145,6 +144,8 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                     Logger.log("AFL has made progress (" + str(fuzz_result.progress) + ")\n", verbosity_level="info")
                 else:
                     Logger.log("AFL has not made progress\n", verbosity_level="debug")
+            if not fuzz_result:
+                Logger.log("AFL has not made progress (fuzz_result missing)\n", verbosity_level="debug")
 
         if time.time() >= timeout_timestamp:
             Logger.log("Timeout detected\n", verbosity_level="debug")
