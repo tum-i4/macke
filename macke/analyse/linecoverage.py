@@ -47,13 +47,18 @@ def linecoverage(macke_directory):
     for file in coverage:
         coverage[file]['uncovered'] -= coverage[file]['covered']
 
+    #for file in coverage:
+    #  print (str(len(cov_dict['covered'])))
+    #  print (file + ": " + str(coverage[file]['covered']))
+    
     # Categorize the per function informations
     perfunction = dict()
+    
     for function, position in funcovs.items():
         for file, lines in position.items():
             if function not in perfunction:
                 perfunction[function] = dict()
-            coverageforfile = coverage.get(file, dict())
+            coverageforfile = coverage.get(function, dict())
             perfunction[function][file] = OrderedDict([
                 ('covered', sorted(list(
                     set(lines) & coverageforfile.get('covered', set())))),
@@ -64,7 +69,24 @@ def linecoverage(macke_directory):
                                         coverageforfile.get('uncovered', set()))
                                   ))
             ])
-
+    '''
+    for filen in coverage:
+        function = coverage[
+        if function not in perfunction:
+            perfunction[function] = dict()
+    
+        coverageforfile = coverage.get(file, dict())
+        perfunction[function][file] = OrderedDict([
+                ('covered', sorted(list(
+                    set(lines) & coverageforfile.get('covered', set())))),
+                ('uncovered', sorted(list(
+                    set(lines) & coverageforfile.get('uncovered', set())))),
+                ('removed', sorted(list((set(lines) -
+                                         coverageforfile.get('covered', set())) -
+                                        coverageforfile.get('uncovered', set()))
+                                  ))    
+    
+    '''
     # Count the absolute numbers
     covered, uncovered, removed = 0, 0, 0
     for _, position in perfunction.items():

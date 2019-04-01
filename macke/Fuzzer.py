@@ -94,16 +94,18 @@ def extract_fuzzer_coverage(macke_directory):
         inputdirectories = [ path.join(fdpath, "queue"), path.join(fdpath, "crashes"), path.join(fdpath, "hangs") ]
 
         # If a function could not be fuzzed
-        if any(not path.exists(d) for d in inputdirectories):
-            continue
+        #if any(not path.exists(d) for d in inputdirectories):
+        #    continue
 
         args = [afltarget, "--fuzz-driver=" + analyzedfunc]
 
         for d in inputdirectories:
-            for f in listdir(d):
+            files = get_files_from_dir(d)
+            for f in files:
+            #for f in listdir(d):
                 # Only look at afl inputs
-                if not f.startswith("id:"):
-                    continue
+                #if not f.startswith("id:"):
+                #    continue
                 inputfilename = path.join(d, f)
                 # When we miss permissions for file, add permissions
                 if not os.access(inputfilename, os.R_OK):
