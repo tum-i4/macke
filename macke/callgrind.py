@@ -59,12 +59,12 @@ def parse_coverage(cov_file):
             id = int(name_str[1:bracket_end])
             if id in name_dict:
                 assert("(" + str(id) + ")\n" == name_str)
-                return name_dict[id]
+                #return name_dict[id]
             else:
                 assert("(" + str(id) + ")\n" != name_str)
                 name_str = name_str[bracket_end+1:].strip()
                 name_dict[id] = name_str
-                return name_str
+            return name_dict[id]
         else:
             return name_str
 

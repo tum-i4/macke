@@ -21,7 +21,9 @@ def linecoverage(macke_directory):
         path.join(macke_directory, "bitcode", "program.bc"))
 
     # Collect fuzzing coverage
+    # TODO: Coverage dictionary contains both lines and functions
     coverage = extract_fuzzer_coverage(macke_directory)
+    #print(coverage.keys())
 
     # Read klee.json information
     klees = get_klee_registry_from_mackedir(macke_directory)
@@ -34,18 +36,18 @@ def linecoverage(macke_directory):
             istatsfile = path.join(macke_directory, 'klee',
                                    path.basename(klee['folder']), "run.istats")
 
-        for file, info in extract_linecoverage(istatsfile).items():
-            if file in coverage:
+        for func, info in extract_linecoverage(istatsfile).items():
+            if func in coverage:
                 # Merge existing information with the new information
-                coverage[file]['covered'] |= info['covered']
-                coverage[file]['uncovered'] |= info['uncovered']
+                coverage[func]['covered'] |= info['covered']
+                coverage[func]['uncovered'] |= info['uncovered']
             else:
                 # Add a new entry to the overall stats
-                coverage[file] = info
+                coverage[func] = info
 
     # lines only covered on some runs are considered as covered
-    for file in coverage:
-        coverage[file]['uncovered'] -= coverage[file]['covered']
+    for func in coverage:
+        coverage[func]['uncovered'] -= coverage[func]['covered']
 
     #for file in coverage:
     #  print (str(len(cov_dict['covered'])))

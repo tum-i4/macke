@@ -31,7 +31,7 @@ def extract_linecoverage(run_istats_file):
            ), "file %s" % run_istats_file
 
     extract = dict()
-    currentfile = ""
+    currentfunc = ""
 
     # Skip the header and read the rest
     for line in content[22:]:
@@ -39,22 +39,21 @@ def extract_linecoverage(run_istats_file):
             # Line with details for the current file
             cols = line.split()
             loc = int(cols[1])
-            if loc != 0 and currentfile != "":
+            if loc != 0 and currentfunc != "":
                 if int(cols[2]) != 0:
                     # This line was covered
-                    extract[currentfile]['covered'].add(loc)
+                    extract[currentfunc]['covered'].add(loc)
                 else:
                     # This line was not covered
-                    extract[currentfile]['uncovered'].add(loc)
+                    extract[currentfunc]['uncovered'].add(loc)
         elif line.startswith("fl="):
             # Line with information about a file
             pass
         elif line.startswith("fn="):
             # Line with information about a function name
-            function = line[3:].strip()
-            if function != "" and function not in extract:
-                extract[function] = {'covered': set(), 'uncovered': set()}
-            pass
+            currentfunc = line[3:].strip()
+            if currentfunc != "" and currentfunc not in extract:
+                extract[currentfunc] = {'covered': set(), 'uncovered': set()}
         elif line.startswith("cfl="):
             # Line with the file name of a called function
             pass
@@ -71,7 +70,7 @@ def extract_linecoverage(run_istats_file):
             raise ValueError("Invalid line %s" % line)
 
     result = dict()
-    for file, lines in extract.items():
-        result[file] = lines
+    for func, lines in extract.items():
+        result[func] = lines
 
     return result
