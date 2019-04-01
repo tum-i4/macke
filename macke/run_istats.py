@@ -51,9 +51,9 @@ def extract_linecoverage(run_istats_file):
             pass
         elif line.startswith("fn="):
             # Line with information about a function name
-            currentfile = line[3:].strip()
-            if currentfile != "" and currentfile not in extract:
-                extract[currentfile] = {'covered': set(), 'uncovered': set()}
+            function = line[3:].strip()
+            if function != "" and function not in extract:
+                extract[function] = {'covered': set(), 'uncovered': set()}
             pass
         elif line.startswith("cfl="):
             # Line with the file name of a called function
