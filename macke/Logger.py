@@ -40,7 +40,7 @@ class Logger:
 
     @staticmethod
     def openfile():
-        if Logger.log_filename=="STDOUT":
+        if (not Logger.log_filename) or Logger.log_filename=="STDOUT":
             Logger.log_file = sys.stdout
         else:
             Logger.log_file = open(Logger.log_filename, "a+")
