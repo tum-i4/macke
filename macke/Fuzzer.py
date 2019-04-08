@@ -228,12 +228,64 @@ class FuzzResult:
         crashcorpus = path.join(self.fuzzoutdir, "crashes")
         hangcorpus = path.join(self.fuzzoutdir, "hangs")
 
-        inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
+        converted = dict()
+        # Convert error and normal files separately to avoid getting stuck
+        
+        inputdirectories = [crashcorpus, hangcorpus]
 
         cnt = 0
         for d in inputdirectories:
             files = get_files_from_dir(d)
             for f in files:
+                """
+                # If the same bytes have already been written for this function, then don't write again
+                stream_file = open(f, "rb")
+                byte_stream = stream_file.read()
+                if byte_stream in converted.keys():
+                    stream_file.close()
+                    Logger.log("convert_to_klee_files: file %s has duplicate content. Not converting.\n"%(f), verbosity_level="debug")
+                    continue
+                converted[byte_stream] = 1 # Just something to make space
+                stream_file.close()
+                """
+                cnt += 1
+                #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
+                #Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
+                """
+                Creates a file <testname>.ktest and <testname>.ktest.err in directory
+                Returns the name of the errfile
+                """
+                errname = "fuzzer%0.5d" % cnt
+                ktestname = path.join(self.outdir, errname + ".ktest")
+
+                if os.path.exists(ktestname):
+                    #Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
+                    continue
+
+                if kleeargs is None:
+                    kleeargs = []
+
+                # Generate .ktest file
+                fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+        
+        inputdirectories = [inputcorpus]
+        for d in inputdirectories:
+            files = get_files_from_dir(d)
+            for f in files:
+                if cnt>=500: # Force stop conversion from getting stuck
+                    Logger.log("convert_to_klee_files: Too many files to convert for %s. Forcing to stop.\n"%(self.analyzedfunc), verbosity_level="debug")
+                    break
+                """
+                # If the same bytes have already been written for this function, then don't write again
+                stream_file = open(f, "rb")
+                byte_stream = stream_file.read()
+                if byte_stream in converted.keys():
+                    stream_file.close()
+                    Logger.log("convert_to_klee_files: file %s has duplicate content. Not converting."%(f), verbosity_level="debug")
+                    continue
+                converted[byte_stream] = 1 # Just something to make space
+                stream_file.close()
+                """
                 cnt += 1
                 #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
                 #Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
