@@ -22,7 +22,7 @@ from .ErrorRegistry import ErrorRegistry
 from .Error import Error
 from .llvm_wrapper import (encapsulate_symbolic, optimize_redundant_globals,
                            prepend_error_from_ktest)
-from .threads import thread_phase_one, thread_fuzz_phase_one, thread_flipper_phase_one, thread_phase_two
+from .threads import thread_phase_one, thread_fuzz_phase_one, thread_flipper_phase_one, thread_phase_two, thread_flipper_fuzzing_first_phase_one
 
 from .cgroups import get_cgroups
 
@@ -59,7 +59,7 @@ class Macke:
                  use_flipper=False, max_flipper_time=30, use_fuzzer=False, libraries=None,
                  fuzzlibdir=None,
                  max_fuzz_time=1, stop_fuzz_when_done=False, generate_smart_fuzz_input=True,
-                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False, flip_logging_desired=False):
+                 fuzzbc=None, fuzz_input_maxlen=32, no_optimize=False, flip_logging_desired=False, flipper_fuzzer_first=None):
         # Only accept valid files and directory
         assert path.isfile(bitcodefile)
 
@@ -142,6 +142,7 @@ class Macke:
         self.use_flipper = use_flipper
         self.max_flipper_time = max_flipper_time
         self.flip_logging_desired = flip_logging_desired
+        self.flipper_fuzzer_first = flipper_fuzzer_first
 
         # Should KLEE do extra optimizations?
         self.no_optimize = no_optimize
@@ -584,15 +585,26 @@ class Macke:
                         Logger.log(str(function) + " -- flipper\n", verbosity_level="debug")
                         afl_outdir = path.join(self.fuzzdir, FUZZFUNCDIR_PREFIX + function)
                         afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
-                        pool.apply_async(thread_flipper_phase_one, (
-                                          self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          afl_outdir, afl_to_klee_dir, self.max_fuzz_time, self.symmains_bc,
-                                          self.get_next_klee_directory(
-                                           dict(phase=phase, bcfile=self.symmains_bc,
-                                                function=function)), self.max_klee_time,
-                                          self.flags_user, self.posixflags, self.posix4main, self.max_flipper_time,
-                                          self.no_optimize, True, self.flip_logging_desired)
-                                         )
+                        if self.flipper_fuzzer_first:
+                            pool.apply_async(thread_flipper_fuzzing_first_phase_one, (
+                                              self.fuzz_manager, cgroups_queue, resultlist, function,
+                                              afl_outdir, afl_to_klee_dir, self.max_fuzz_time, self.symmains_bc,
+                                              self.get_next_klee_directory(
+                                               dict(phase=phase, bcfile=self.symmains_bc,
+                                                    function=function)), self.max_klee_time,
+                                              self.flags_user, self.posixflags, self.posix4main, self.max_flipper_time,
+                                              self.no_optimize, True, self.flip_logging_desired)
+                                             )
+                        else:
+                            pool.apply_async(thread_flipper_phase_one, (
+                                              self.fuzz_manager, cgroups_queue, resultlist, function,
+                                              afl_outdir, afl_to_klee_dir, self.max_fuzz_time, self.symmains_bc,
+                                              self.get_next_klee_directory(
+                                               dict(phase=phase, bcfile=self.symmains_bc,
+                                                    function=function)), self.max_klee_time,
+                                              self.flags_user, self.posixflags, self.posix4main, self.max_flipper_time,
+                                              self.no_optimize, True, self.flip_logging_desired)
+                                             )
             else:
                 if self.use_fuzzer:
                     for function in run:
