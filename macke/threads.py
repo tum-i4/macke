@@ -26,9 +26,6 @@ def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, ou
     except Exception as exc:
         Logger.log("A fuzz thread in phase one threw an exception\n", verbosity_level="error")
         Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
-        Logger.log(exc + "\n", verbosity_level="error")
-        Logger.log(sys.exc_info() + "\n", verbosity_level="error")
-        Logger.log(str(traceback.format_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
 
     cgroupqueue.put(cgroup)
 
@@ -84,9 +81,6 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             except Exception as exc:
                 Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
                 Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
-                Logger.log(exc + "\n", verbosity_level="error")
-                Logger.log(sys.exc_info() + "\n", verbosity_level="error")
-                Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
 
             # Translate klee files to fuzz files
 
@@ -140,7 +134,11 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
                 if fuzz_result.progress:
                     progress_done = True
                     # transform fuzz files to klee files
-                    fuzz_result.convert_to_klee_files(fuzzmanager)
+                    try:
+                        fuzz_result.convert_to_klee_files(fuzzmanager)
+                    except Exception as exc:
+                        Logger.log("A flipper thread threw an exception\n", verbosity_level="error")
+                        Logger.log("\tThe analyzed function was: " + functionname + "\n", verbosity_level="error")
                     Logger.log("AFL has made progress (" + str(fuzz_result.progress) + ")\n", verbosity_level="info")
                 else:
                     Logger.log("AFL has not made progress\n", verbosity_level="debug")
@@ -151,53 +149,40 @@ def thread_flipper_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname,
             Logger.log("Timeout detected\n", verbosity_level="debug")
             timeout_detected = True
 
+    """
     if fuzz_result:
         fuzz_result.convert_erros_to_klee_files(["queue", "crashes"])
-
     """
-    if not timeout_detected:
-        # flipping terminated due to lack of progress
-        # run KLEE for the remaining time
 
-        remaining_time = timeout_timestamp - time.time()
-
-        if remaining_time > 1:
-            Logger.log("Running KLEE again for " + str(remaining_time) + "\n", verbosity_level="debug")
-            try:
-                # run KLEE without saturation checks, as flipping is no longer performed
-                klee_result = execute_klee( symmains_bc, functionname, outdir, remaining_time, flipper_mode, flags,
-                                            posixflags, posix4main, no_optimize)
-            # pylint: disable=broad-except
-            except Exception as exc:
-                Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
-                Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
-                Logger.log(exc + "\n", verbosity_level="error")
-                Logger.log(sys.exc_info() + "\n", verbosity_level="error")
-                Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
-    """
     resultlist.append(klee_result)
     Logger.log("done thread_flipper_phase_one on : " + functionname + " (flipped " + str(flip_counter) + " times)\n", verbosity_level="debug")
 
 def thread_phase_one(
         resultlist, functionname, symmains_bc, outdir, timeout,
-        flags, posixflags, posix4main, no_optimize=False, flipper_mode=False):
+        flags, posixflags, posix4main, no_optimize=False, flipper_mode=False, logging_desired=False):
     """
     This function is executed by the parallel processes in phase one
     """
     Logger.log("thread_phase_one: " + functionname + "\n", verbosity_level="debug")
+    
+    if logging_desired:
+        Logger.log("Plotting data at " + outdir + "\n", verbosity_level="debug")
+        plot_data_logger = PlotDataLogger(outdir, outdir, outdir)
+    else:
+        Logger.log("Plotting data not desired\n", verbosity_level="debug")
+        plot_data_logger = None
 
     # Just run KLEE on it
     try:
         resultlist.append(execute_klee(
-            symmains_bc, functionname, outdir, timeout, flipper_mode, flags, posixflags, posix4main, no_optimize))
+            symmains_bc, functionname, outdir, timeout, flipper_mode, flags, posixflags, posix4main, no_optimize, "", plot_data_logger))
     # pylint: disable=broad-except
     except Exception as exc:
         Logger.log("A thread in phase one threw an exception\n", verbosity_level="error")
         Logger.log("The analyzed function was: " + functionname + "\n", verbosity_level="error")
-        Logger.log(exc + "\n", verbosity_level="error")
-        Logger.log(sys.exc_info() + "\n", verbosity_level="error")
-        Logger.log(str(traceback.extract_tb(sys.exc_info()[2])) + "\n", verbosity_level="error")
-
+        print(exc)
+        print(sys.exc_info())
+        print(str(traceback.extract_tb(sys.exc_info()[2])))
     Logger.log("done thread_phase_one: " + functionname + "\n", verbosity_level="debug")
 
 
