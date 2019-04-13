@@ -190,10 +190,50 @@ def compute_klee_progress(path: str):
     return klee_progress#(klee_progress, progress_done)
 
 SATURATION_CHECK_PERIOD = 12
-def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger):
+def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger, flipper_mode=False):
     saturated = False
     #progress_done = False
 
+    if plot_data_logger:
+        Logger.log("Logging coverage\n", verbosity_level="debug")
+    else:
+        Logger.log("No plot_data_logger. Not logging coverage", verbosity_level="debug")
+
+    if not flipper_mode: # Running in normal non-flipper mode
+        while not saturated:
+            if (int(max_time_each) + start_time - time.time()) > SATURATION_CHECK_PERIOD:
+                # we can sleep an entire period and recheck the output
+                time.sleep(SATURATION_CHECK_PERIOD)
+            else:
+                # sleep what time is left and do a last check
+                time.sleep(int(max_time_each) + start_time - time.time())
+            
+            len_old_covered = len(klee_progress)
+
+            klee_progress = compute_klee_progress(path)
+            Logger.log("compute_klee_progress: size of progress is " + str(len(klee_progress)) + "\n",
+                       verbosity_level="debug")
+            
+            if (time.time() - start_time) > int(max_time_each):
+                Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
+                saturated = True
+                continue
+            if not os.path.exists(os.path.join(path, "run.istats")):
+                Logger.log("Path " + os.path.join(path, "run.istats") + " does not exits (yet)\n", verbosity_level="debug")
+                continue
+            if plot_data_logger:
+                try:
+                    Logger.log("Logging coverage \n", verbosity_level="debug")
+                    plot_data_logger.log_klee_coverage()
+                except Exception as exc:
+                    Logger.log("An error occurred while logging coverage.", verbosity_level="error")
+                    print(exc)
+                    print(sys.exc_info())
+                    print(str(traceback.extract_tb(sys.exc_info()[2])))
+
+        return len(klee_progress)
+    
+    # For flipper mode
     while not saturated:
         if (time.time() - start_time) > int(max_time_each):
             Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
@@ -202,7 +242,7 @@ def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plo
 
         if (int(max_time_each) + start_time - time.time()) > SATURATION_CHECK_PERIOD:
             # we can sleep an entire period and recheck the output
-            time.sleep(12)
+            time.sleep(SATURATION_CHECK_PERIOD)
         else:
             # sleep what time is left and do a last check
             time.sleep(int(max_time_each) + start_time - time.time())
@@ -250,8 +290,17 @@ def execute_klee(
         timeout = 3600
     else:
         if not flipper_mode:
+            """
             flags.append("--stats-write-interval=" + str(timeout*2))
             flags.append("--istats-write-interval=" + str(timeout*2))
+            """
+            if timeout > SATURATION_CHECK_PERIOD:
+                flags.append("--stats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+                flags.append("--istats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+            else:
+                # low timeout
+                flags.append("--stats-write-interval=1")
+                flags.append("--istats-write-interval=1")
         else: # flipper
             # set write-interval to the timeout / SATURATION_CHECK_PERIOD
             if timeout > SATURATION_CHECK_PERIOD:
@@ -328,7 +377,7 @@ def execute_klee(
         if timeout > 12:
             time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
             # check for saturation
-            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger) - \
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger, flipper_mode) - \
                        initial_progress_size
         else:
             # low timeout, no point in checking saturation
@@ -339,12 +388,19 @@ def execute_klee(
         proc.kill()
         out = "\n--- kill(9)ed by MACKE for reaching saturation"
     else:
+        start_time = time.time()
         try:
+            klee_progress = []
+            initial_progress_size = 0
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=tmpdir, preexec_fn=setsid)
+            """
             out = _check_output(
                 command, cwd=tmpdir,
                 timeout=timeout).decode("utf-8", 'ignore')
-            klee_progress = compute_klee_progress(outdir)
-            progress = len(klee_progress)
+            """
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger, flipper_mode)
+            proc.kill()
+            out = "\n--- kill(9)ed by MACKE for reaching saturation"
         except subprocess.TimeoutExpired as terr:
             out = terr.output.decode("utf-8", 'ignore')
             out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
