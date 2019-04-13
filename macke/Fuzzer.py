@@ -228,83 +228,85 @@ class FuzzResult:
         crashcorpus = path.join(self.fuzzoutdir, "crashes")
         hangcorpus = path.join(self.fuzzoutdir, "hangs")
 
-        converted = dict()
-        # Convert error and normal files separately to avoid getting stuck
+        
+        self.errorlist = []
+        asanerrorlist = []
+
+        # again duck typing names
+        self.errfiles = []
+        self.testcount = 0
+        self.errorcount = 0
         
         inputdirectories = [crashcorpus, hangcorpus]
 
-        cnt = 0
+        # Convert error and normal files separately to avoid getting stuck
         for d in inputdirectories:
             files = get_files_from_dir(d)
             for f in files:
-                """
-                # If the same bytes have already been written for this function, then don't write again
-                stream_file = open(f, "rb")
-                byte_stream = stream_file.read()
-                if byte_stream in converted.keys():
-                    stream_file.close()
-                    Logger.log("convert_to_klee_files: file %s has duplicate content. Not converting.\n"%(f), verbosity_level="debug")
-                    continue
-                converted[byte_stream] = 1 # Just something to make space
-                stream_file.close()
-                """
-                cnt += 1
-                #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
-                #Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
+                self.testcount += 1
                 """
                 Creates a file <testname>.ktest and <testname>.ktest.err in directory
                 Returns the name of the errfile
                 """
-                errname = "fuzzer%0.5d" % cnt
+                errname = "fuzzer%0.5d" % self.testcount
                 ktestname = path.join(self.outdir, errname + ".ktest")
 
                 if os.path.exists(ktestname):
-                    #Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
                     continue
 
                 if kleeargs is None:
                     kleeargs = []
 
-                # Generate .ktest file
-                fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+                reproduced = self.fuzzmanager.execute_reproducer(self.cgroup, f, self.analyzedfunc)
+                # If an error was reproduced then it will be converted later
+                if reproduced.iserror and reproduced.has_stack_trace():
+                    error = self.fuzzmanager.minimize_crash(self.cgroup, f, reproduced, self.analyzedfunc)
+                    self.errorcount += 1
+                    self.errfiles.append(f)
+                    asanerrorlist.append(error)
+                else:
+                    # Generate .ktest file
+                    fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
         
         inputdirectories = [inputcorpus]
         for d in inputdirectories:
             files = get_files_from_dir(d)
             for f in files:
-                if cnt>=500: # Force stop conversion from getting stuck
+                if self.testcount>=500: # Force stop conversion from getting stuck
                     Logger.log("convert_to_klee_files: Too many files to convert for %s. Forcing to stop.\n"%(self.analyzedfunc), verbosity_level="debug")
                     break
-                """
-                # If the same bytes have already been written for this function, then don't write again
-                stream_file = open(f, "rb")
-                byte_stream = stream_file.read()
-                if byte_stream in converted.keys():
-                    stream_file.close()
-                    Logger.log("convert_to_klee_files: file %s has duplicate content. Not converting."%(f), verbosity_level="debug")
-                    continue
-                converted[byte_stream] = 1 # Just something to make space
-                stream_file.close()
-                """
-                cnt += 1
-                #Logger.log("convert_to_klee_files: started processing file " + f + "\n", verbosity_level="debug")
-                #Logger.log("convert_to_klee_files: processing " + f + "\n", verbosity_level="debug")
+                self.testcount += 1
                 """
                 Creates a file <testname>.ktest and <testname>.ktest.err in directory
                 Returns the name of the errfile
                 """
-                errname = "fuzzer%0.5d" % cnt
+                errname = "fuzzer%0.5d" % self.testcount
                 ktestname = path.join(self.outdir, errname + ".ktest")
 
                 if os.path.exists(ktestname):
-                    #Logger.log("convert_to_klee_files: ktest file " + ktestname + " already exists. Skipping it\n", verbosity_level="debug")
                     continue
 
                 if kleeargs is None:
                     kleeargs = []
 
-                # Generate .ktest file
-                fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+                reproduced = self.fuzzmanager.execute_reproducer(self.cgroup, f, self.analyzedfunc)
+                # If an error was reproduced then it will be converted later
+                if reproduced.iserror and reproduced.has_stack_trace():
+                    error = self.fuzzmanager.minimize_crash(self.cgroup, f, reproduced, self.analyzedfunc)
+                    self.errorcount += 1
+                    self.errfiles.append(f)
+                    asanerrorlist.append(error)
+                else:
+                    # Generate .ktest file
+                    fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+        
+        # Convert AsanErrors to ktests (and ktest.errs)
+        for i in range(0, len(asanerrorlist)):
+            self.testcount += 1
+            errname = "fuzzer%0.5d" % self.testcount
+            Logger.log("convert_to_klee_files: Converting AsanError to test - %s.ktest.\n"%(errname), verbosity_level="debug")
+            errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
+            self.errorlist.append(Error(errfile, self.analyzedfunc))
 
     def convert_erros_to_klee_files(self, inputdirectories):  #inputcorpus, crashcorpus):
         """
