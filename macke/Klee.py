@@ -178,7 +178,11 @@ def compute_klee_progress(path: str):
     #progress_done = False
     tmp_istats_dir = tempfile.mkdtemp()
     os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
-    new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+    try:
+        new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+    except Exception as exc:
+        print("Something went wrong while reading a tmp directory. Moving on")
+        new_covered = dict()
     klee_progress = []
     for f in new_covered.keys():
         for l in new_covered[f].keys():
