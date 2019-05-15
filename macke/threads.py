@@ -16,11 +16,19 @@ import time
 
 # We parse the fuzztime in flags
 def thread_fuzz_phase_one(fuzzmanager, cgroupqueue, resultlist, functionname, outdir, afl_to_klee_dir, fuzztime,
-                          flipper_mode):
+                          flipper_mode, logging_desired=False):
     Logger.log("thread_fuzz_phase_one: " + functionname + "\n", verbosity_level="debug")
     cgroup = cgroupqueue.get()
+    
+    if logging_desired:
+        Logger.log("Plotting data at " + outdir + "\n", verbosity_level="debug")
+        plot_data_logger = PlotDataLogger(outdir, outdir, outdir)
+    else:
+        Logger.log("Plotting data not desired\n", verbosity_level="debug")
+        plot_data_logger = None
+    
     try:
-        result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir)
+        result = fuzzmanager.execute_afl_fuzz(cgroup, functionname, outdir, fuzztime, flipper_mode, afl_to_klee_dir, plot_data_logger)
         #result.convert_erros_to_klee_files(["queue", "crashes"])
         resultlist.append(result)
     except Exception as exc:

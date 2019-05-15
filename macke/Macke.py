@@ -613,7 +613,7 @@ class Macke:
                         afl_to_klee_dir = path.join(afl_outdir, "afl_to_klee_dir")
                         pool.apply_async(thread_fuzz_phase_one,
                                          (self.fuzz_manager, cgroups_queue, resultlist, function,
-                                          afl_outdir, afl_to_klee_dir, self.max_fuzz_time, False))
+                                          afl_outdir, afl_to_klee_dir, self.max_fuzz_time, False, self.flip_logging_desired))
                 else:
                     # symbolic execution only
                     for function in run:

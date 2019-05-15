@@ -1,3 +1,8 @@
+"""
+Experimental script to generate coverage and other graphs. 
+Need to adapt absolute paths to make it work for another user.  
+"""
+
 import matplotlib
 matplotlib.use('Agg')
 
@@ -6,6 +11,17 @@ import os, argparse, time, glob
 from datetime import datetime, timedelta
 from matplotlib.dates import drange
 from collections import OrderedDict
+
+def convert_to_delta_time_slabs(time_slabs):
+    start = time_slabs[0][0]
+    delta_time_slabs = []
+    for slab in time_slabs:
+        delta_time_slab = []
+        for t in slab:
+            delta_time_slab.append((t-start).total_seconds())
+        delta_time_slabs.append(delta_time_slab)
+    
+    return delta_time_slabs
 
 def split_coverage_into_slabs(time_ticks, coverage, switch_points, agents):
     coverage_slabs = []
@@ -39,7 +55,7 @@ def split_coverage_into_slabs(time_ticks, coverage, switch_points, agents):
             cur_time_slab.append(time_ticks[time_i]) 
             cur_coverage_slab.append(coverage[time_i])
         else: # Passed a switch point
-            print ("time_i: " + str(time_i))
+            #print ("time_i: " + str(time_i))
             #print (time_ticks[time_i])
             #print (coverage[time_i])
             #print (agents[switch_i])
@@ -118,8 +134,8 @@ def parse_switch_points(log_filename):
     switch_points.append(datetime.strptime(fields[0].strip(), "%a %b %d %H:%M:%S %Y"))          
     """
     
-    print (switch_points)
-    print (agents)      
+    #print (switch_points)
+    #print (agents)      
     return switch_points, agents
 
 def parse_coverage(coverage_file, allowed_filenames):
@@ -137,7 +153,9 @@ def parse_coverage(coverage_file, allowed_filenames):
             continue
 
         if basename not in allowed_filenames:
+            """
             print("%s not in allowed_filenames"%(basename))
+            """
             continue
 
         times.append(datetime.strptime(time_s, "%a %b %d %H:%M:%S %Y"))
@@ -181,7 +199,7 @@ def get_allowed_filenames(allowed_list):
 
         allowed_filenames.extend(basenames)
 
-    print (allowed_filenames)
+    #print (allowed_filenames)
 
     return allowed_filenames
 
@@ -190,15 +208,24 @@ if __name__=="__main__":
     #parser.add_argument("-d", "--jolf-results-dir", help="Directory containing results from Jolf")
     parser.add_argument("-o", "--output-dir", help="Where to store the plots")
     parser.add_argument("-c", "--coverage-file", help="File containing coverage")
+    parser.add_argument("-s", "--source-name", help="Directories (specified with wildcard chars) where source resides")
+    parser.add_argument("-p", "--plotting-off", action="store_true")
 
     args = parser.parse_args()
 
-    allowed_filenames = get_allowed_filenames(["/home/vintila/sources/*/*/*.c", "/home/vintila/sources/*/*/*.h"])
-    allowed_filenames.append(get_allowed_filenames(["/home/vintila/sources/*/*.c", "/home/vintila/sources/*/*.h"]))
-    #print(allowed_filenames)
+    for d in glob.glob("/home/ognawala/issta-evals-2019/program-source-gcov/*/"):
+        if args.source_name in d:
+            parent_dir = d
+
+    print(parent_dir)
+    if ("bzip2" in parent_dir) or ("less" in parent_dir):
+        allowed_filenames = get_allowed_filenames([parent_dir + "/*.c", parent_dir + "/*.h"])
+    else:
+        allowed_filenames = get_allowed_filenames([parent_dir + "/*/*.c", parent_dir + "/*/*.h"])
 
     times, lines, agents = parse_coverage(args.coverage_file, allowed_filenames)
-
+    for i, l in enumerate(lines):
+        print(str(times[i]) + ": " + str(lines[i]) + ": " + agents[i])
     time_ticks, coverage = group_lines_by_time(times)
     """
     for i, t in enumerate(time_ticks):
@@ -215,21 +242,20 @@ if __name__=="__main__":
 
     fig, ax = plt.subplots()
 
-    for i in range(len(time_slabs)):
-        print(time_slabs[i][0])
-        print(time_slabs[i][-1])
+    delta_time_slabs = convert_to_delta_time_slabs(time_slabs)
 
+    for i in range(len(time_slabs)):
         if agents[i]=="AFL":
             color = 'b-'
         elif agents[i]=="KLEE":
             color = 'g-'
         #print (agents[i] + ": " + str(time_slabs[i]) + ", " + str(coverage_slabs[i]))
-        ax.plot(time_slabs[i], coverage_slabs[i], color)
-        print("")
+        ax.plot(delta_time_slabs[i], coverage_slabs[i], color)
         
     #legend = ax.legend(loc='upper right')
 
-    plot_name = os.path.basename(os.path.dirname(args.coverage_file)) + ".png"
-    plt.savefig(os.path.join(args.output_dir, plot_name))
-    
-    print (args.output_dir + "/" + plot_name)
+    if not args.plotting_off:
+        plot_name = os.path.basename(os.path.dirname(args.coverage_file)) + ".png"
+        plt.savefig(os.path.join(args.output_dir, plot_name))
+        
+        print (args.output_dir + "/" + plot_name)
