@@ -146,6 +146,14 @@ def main():
     )
 
     parser.add_argument(
+        '--flipper-fuzzer-first',
+        dest='flipper_fuzzer_first',
+        action='store_true',
+        default=False,
+        help="(experimental) Toggle to start the flipper mode with fuzzer first"
+    )
+    
+    parser.add_argument(
         '--max-flipper-time',
         type=int,
         default=30,
@@ -301,7 +309,7 @@ def main():
                   exclude_known_from_phase_two=args.exclude_known, max_klee_time=args.max_klee_time, use_flipper=args.flipper, max_flipper_time=args.max_flipper_time,
                   use_fuzzer=args.use_fuzzer, max_fuzz_time=args.max_fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
                   generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize,
-                  flip_logging_desired=args.log_flipping)
+                  flip_logging_desired=args.log_flipping, flipper_fuzzer_first=args.flipper_fuzzer_first)
     macke.run_complete_analysis()
 
     Logger.close()
