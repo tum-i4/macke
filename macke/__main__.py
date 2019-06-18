@@ -142,7 +142,7 @@ def main():
         '--flipper',
         type=str2bool,
         default=False,
-        help="Toggle to use experimental fuzzing feature"
+        help="Toggle to use flipping feature"
     )
 
     parser.add_argument(

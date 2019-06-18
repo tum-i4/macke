@@ -71,6 +71,11 @@ Otherwise if you want to analyze the isolated functions with fuzzing (AFL) then 
 macke --use-fuzzer=1 --fuzz-bc=2beAnalyzedCompiledWithClang3.8.bc 2beAnalyzed.bc
 ```
 
+Finally, if you want to analyze the isolated functions with flipper (switch between KLEE and AFL, whenever one of them saturates) then run the following:
+```
+macke --flipper=1 --fuzz-bc=2beAnalyzedCompiledWithClang3.8.bc 2beAnalyzed.bc
+```
+
 We wish you happy testing! If you have problems converting existing source code bases to bitcode files, you should have a look at this [tool for improving make](https://github.com/tum-i22/MakeAdditions).
 
 ## Troubleshooting
