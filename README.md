@@ -113,6 +113,6 @@ Then, in all subsequent macke commands, also add --ignore-swap, if your operatin
 
 ## Author's note
 For current issues, suggestions, datasets and gratitude please email [me](mailto:saahil.ognawala@tum.de). 
-Big thanks to [HuTo](t.hutzelmann@tum.de) and [Fabian Kilger](fabian.kilger@tum.de) for most of the development effort. 
+Big thanks to [HuTo](t.hutzelmann@tum.de) and [Fabian Kilger](fabian.kilger@tum.de) for much of the development effort. 
 
 > [Saahil Ognawala](https://www22.in.tum.de/en/ognawala/)

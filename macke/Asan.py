@@ -48,7 +48,7 @@ class AsanResult:
                 description = line[line.find(b"Sanitizer:")+11:]
                 description.strip()
                 desc_parts = description.split(b' ')
-                if b'on' in description:
+                if (b'on' in description) and (b'on' in desc_parts):
                     self.description = b' '.join(desc_parts[0:desc_parts.index(b'on')]).decode("utf-8")
                 else:
                     self.description = desc_parts[0].decode("utf-8", 'ignore').rstrip(':')

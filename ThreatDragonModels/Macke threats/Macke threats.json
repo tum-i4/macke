@@ -1,0 +1,17 @@
+{
+  "summary": {
+    "title": "Macke threats",
+    "owner": "saahil"
+  },
+  "detail": {
+    "contributors": [],
+    "diagrams": [
+      {
+        "title": "first-model",
+        "thumbnail": "./public/content/images/thumbnail.jpg",
+        "id": 0
+      }
+    ],
+    "reviewer": "saahil"
+  }
+}
