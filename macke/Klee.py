@@ -9,12 +9,16 @@ import shutil
 import subprocess
 import tempfile
 import signal
+import time
+import os
 
 from collections import OrderedDict
 from os import listdir, path, makedirs, killpg, getpgid, setsid
 
 from .config import KLEEBIN
 from .constants import ERRORFILEEXTENSIONS, KLEEFLAGS
+
+from .Logger import Logger
 
 
 # python implementation of timed check_output fails to kill klee correctly
@@ -42,13 +46,14 @@ class KleeResult:
     Container, that store all information about a klee run
     """
 
-    def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None):
+    def __init__(self, bcfile, analyzedfunc, outdir, stdoutput, flags=None, progress=0):
         # Set all atttributes given by the constructor
         self.bcfile = bcfile
         self.analyzedfunc = analyzedfunc
         self.outdir = outdir
         self.flags = [] if flags is None else flags
         self.stdoutput = stdoutput
+        self.progress = progress
 
         # Calculate some statistics
         match = re.search(
@@ -146,10 +151,130 @@ def reconstruct_from_klee_json(kleejson):
 
     return result
 
+def parse_run_istats(istats_file):
+    istats = open(istats_file)
+
+    covered = {}
+
+    cur_file = None
+
+    for line in istats:
+        if line.startswith("fl="):
+            cur_file = line.split("=")[1].strip()
+            continue
+
+        tokens = line.split()
+        if len(tokens) != 15:
+            continue
+        src, cov = int(tokens[1]), int(tokens[2])  # Read source-level coverage rather than LLVM level
+
+        if (cov > 0):
+            if cur_file not in covered.keys():  # The covered file is newly covered
+                covered[cur_file] = {}
+            covered[cur_file][src] = cov
+    return covered
+
+def compute_klee_progress(path: str):
+    #progress_done = False
+    tmp_istats_dir = tempfile.mkdtemp()
+    os.system("cp " + os.path.join(path, "run.istats") + " " + tmp_istats_dir)
+    try:
+        new_covered = parse_run_istats(os.path.join(tmp_istats_dir, "run.istats"))
+    except Exception as exc:
+        print("Something went wrong while reading a tmp directory. Moving on")
+        new_covered = dict()
+    klee_progress = []
+    for f in new_covered.keys():
+        for l in new_covered[f].keys():
+            if (f, l) not in klee_progress:
+                klee_progress.append((f, l))
+                #progress_done = True
+
+    shutil.rmtree(tmp_istats_dir)
+    return klee_progress#(klee_progress, progress_done)
+
+SATURATION_CHECK_PERIOD = 12
+def wait_for_klee_saturation(start_time, max_time_each, path, klee_progress, plot_data_logger, flipper_mode=False):
+    saturated = False
+    #progress_done = False
+
+    if plot_data_logger:
+        Logger.log("Logging coverage\n", verbosity_level="debug")
+    else:
+        Logger.log("No plot_data_logger. Not logging coverage", verbosity_level="debug")
+
+    if not flipper_mode: # Running in normal non-flipper mode
+        while not saturated:
+            if (int(max_time_each) + start_time - time.time()) > SATURATION_CHECK_PERIOD:
+                # we can sleep an entire period and recheck the output
+                time.sleep(SATURATION_CHECK_PERIOD)
+            else:
+                # sleep what time is left and do a last check
+                time.sleep(int(max_time_each) + start_time - time.time())
+            
+            len_old_covered = len(klee_progress)
+
+            klee_progress = compute_klee_progress(path)
+            Logger.log("compute_klee_progress: size of progress is " + str(len(klee_progress)) + "\n",
+                       verbosity_level="debug")
+            
+            if (time.time() - start_time) > int(max_time_each):
+                Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
+                saturated = True
+                continue
+            if not os.path.exists(os.path.join(path, "run.istats")):
+                Logger.log("Path " + os.path.join(path, "run.istats") + " does not exits (yet)\n", verbosity_level="debug")
+                continue
+            if plot_data_logger:
+                try:
+                    Logger.log("Logging coverage \n", verbosity_level="debug")
+                    plot_data_logger.log_klee_coverage()
+                except Exception as exc:
+                    Logger.log("An error occurred while logging coverage.", verbosity_level="error")
+                    print(exc)
+                    print(sys.exc_info())
+                    print(str(traceback.extract_tb(sys.exc_info()[2])))
+
+        return len(klee_progress)
+    
+    # For flipper mode
+    while not saturated:
+        if (time.time() - start_time) > int(max_time_each):
+            Logger.log("KLEE saturated because of timeout.\n", verbosity_level="info")
+            saturated = True
+            continue
+
+        if (int(max_time_each) + start_time - time.time()) > SATURATION_CHECK_PERIOD:
+            # we can sleep an entire period and recheck the output
+            time.sleep(SATURATION_CHECK_PERIOD)
+        else:
+            # sleep what time is left and do a last check
+            time.sleep(int(max_time_each) + start_time - time.time())
+
+        if not os.path.exists(os.path.join(path, "run.istats")):
+            Logger.log("Path " + os.path.join(path, "run.istats") + " does not exits (yet)\n", verbosity_level="debug")
+            continue
+
+        len_old_covered = len(klee_progress)
+
+        klee_progress = compute_klee_progress(path)
+        Logger.log("compute_klee_progress: size of progress is " + str(len(klee_progress)) + "\n",
+                   verbosity_level="debug")
+
+        if len_old_covered < len(klee_progress):
+            Logger.log("Continuing KLEE. Line coverage increased from " + str(len_old_covered) + " to " +
+                       str(len(klee_progress)) + "\n", verbosity_level="info")
+        else:
+            Logger.log("KLEE saturated. No new line-coverage found\n", verbosity_level="info")
+            saturated = True
+        if plot_data_logger:
+            plot_data_logger.log_klee_coverage()
+
+    return len(klee_progress)
 
 def execute_klee(
-        bcfile, analyzedfunc, outdir,
-        flags=None, posixflags=None, posix4main=None):
+        bcfile, analyzedfunc, outdir, timeout, flipper_mode,
+        flags=None, posixflags=None, posix4main=None, no_optimize=False, afl_to_klee_dir="", plot_data_logger=None):
     """
     Execute KLEE on bcfile with the given flag and put the output in outdir
     """
@@ -157,24 +282,38 @@ def execute_klee(
     # use empty list as default flags
     flags = [] if flags is None else flags
 
-    timeout = None
-    time_prefix = "--max-time="
-    # Get the timeout from the passed flags (hacky)
-    for f in flags:
-        if f.startswith(time_prefix):
-            # double the timeout for killing to be safe with time inprecisions
-            timeout = 2 * int(f[len(time_prefix):])
-            break
+    progress = 0
 
     flags.extend(KLEEFLAGS)
+    if no_optimize:
+        flags.remove("--optimize")
 
-    # set write-interval to the timeout - 2, as we will kill klee when it reaches timeout
     if timeout is None:
         flags.append("--stats-write-interval=3600")
         flags.append("--istats-write-interval=3600")
+        timeout = 3600
     else:
-        flags.append("--stats-write-interval=" + str(timeout - 2))
-        flags.append("--istats-write-interval=" + str(timeout - 2))
+        if not flipper_mode:
+            """
+            flags.append("--stats-write-interval=" + str(timeout*2))
+            flags.append("--istats-write-interval=" + str(timeout*2))
+            """
+            if timeout > SATURATION_CHECK_PERIOD:
+                flags.append("--stats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+                flags.append("--istats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+            else:
+                # low timeout
+                flags.append("--stats-write-interval=1")
+                flags.append("--istats-write-interval=1")
+        else: # flipper
+            # set write-interval to the timeout / SATURATION_CHECK_PERIOD
+            if timeout > SATURATION_CHECK_PERIOD:
+                flags.append("--stats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+                flags.append("--istats-write-interval=" + str(SATURATION_CHECK_PERIOD))
+            else:
+                # low timeout
+                flags.append("--stats-write-interval=1")
+                flags.append("--istats-write-interval=1")
 
     # Build the posix flags
     posixflags = [] if posixflags is None else posixflags
@@ -182,46 +321,117 @@ def execute_klee(
 
     if analyzedfunc == "main":
         # the main function is handled a little bit differently
-        posixflags.extend(posix4main)
+        if posix4main:
+            posixflags.extend(posix4main)
+        Logger.log("Analyzing main. Adding %s to %s\n"%(str(posix4main), str(posixflags)), verbosity_level="debug")
     else:
         flags += ["--entry-point", "macke_%s_main" % analyzedfunc]
 
+    
+    command = ([KLEEBIN, "--output-dir=" + outdir] + flags)
+    
+    # AFL->KTest conversion already done
+    # seed out dir should be added BEFORE the bc file and posixflags
+    if flipper_mode and os.path.isdir(afl_to_klee_dir):
+        if len(listdir(afl_to_klee_dir))>0:
+            command += [" -seed-out-dir=" + afl_to_klee_dir, "--named-seed-matching", "--zero-seed-extension", "--allow-seed-extension"]
+    
+    # Use watchdog only if there's a max-time
+    if not flipper_mode:
+        time_prefix = "--max-time=" + str(timeout)
+        command += [time_prefix, "--watchdog"]
+        """
+        # Get the timeout from the passed flags (hacky)
+        for f in flags:
+            if f.startswith(time_prefix):
+                # double the timeout for killing to be safe with time inprecisions
+                timeout = 2 * int(f[len(time_prefix):])
+                break
+        """
+
     # Strange, but the posix flags must be append after bcfile
-    command = ([KLEEBIN, "--output-dir=" + outdir] + flags +
-               [bcfile] + posixflags)
+    command += [bcfile] + posixflags
 
     # Create a new, empty directory
     tmpdir = tempfile.mkdtemp(prefix="macke_tmp_")
 
+    Logger.log("KLEE command: " + str(command) + "\n", verbosity_level="debug")
+
+    out = ""
+
     # actually run KLEE
-    try:
-        out = _check_output(
-            command, cwd=tmpdir,
-            timeout=timeout).decode("utf-8", 'ignore')
-    except subprocess.TimeoutExpired as terr:
-        out = terr.output.decode("utf-8", 'ignore')
-        out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
-    except subprocess.CalledProcessError as cperr:
-        # If something went wrong, we still read the output for analysis
-        # We might have to create the outdir though, if klee failed and didn't create it
-        if not path.exists(outdir):
-            makedirs(outdir)
-        out = cperr.output.decode("utf-8", 'ignore')
+    if flipper_mode:
+        # start running KLEE with total timeout
+
+        # init klee progress
+        if not os.path.exists(os.path.join(outdir, "run.istats")):
+            klee_progress = []
+            initial_progress_size = 0
+        else:
+            # we had some previous progress
+            klee_progress = compute_klee_progress(outdir)
+            initial_progress_size = len(klee_progress)
+
+            Logger.log("compute_klee_progress: initial progress size is " + str(initial_progress_size) + "\n",
+                       verbosity_level="debug")
+
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=tmpdir, preexec_fn=setsid)
+
+        start_time = time.time()
+        if timeout > 12:
+            time.sleep(12)  # Takes a lot of time for KLEE to generate anything meaningful
+            # check for saturation
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger, flipper_mode) - \
+                       initial_progress_size
+        else:
+            # low timeout, no point in checking saturation
+            time.sleep(timeout)
+
+        # klee saturated
+        #killpg(getpgid(proc.pid), signal.SIGKILL)
+        proc.kill()
+        out = "\n--- kill(9)ed by MACKE for reaching saturation"
+    else:
+        start_time = time.time()
+        try:
+            klee_progress = []
+            initial_progress_size = 0
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=tmpdir, preexec_fn=setsid)
+            """
+            out = _check_output(
+                command, cwd=tmpdir,
+                timeout=timeout).decode("utf-8", 'ignore')
+            """
+            progress = wait_for_klee_saturation(start_time, timeout, outdir, klee_progress, plot_data_logger, flipper_mode)
+            proc.kill()
+            out = "\n--- kill(9)ed by MACKE for reaching saturation"
+        except subprocess.TimeoutExpired as terr:
+            out = terr.output.decode("utf-8", 'ignore')
+            out += "\n--- kill(9)ed by MACKE for overstepping max-time twice"
+        except subprocess.CalledProcessError as cperr:
+            # If something went wrong, we still read the output for analysis
+            # We might have to create the outdir though, if klee failed and didn't create it
+            if not path.exists(outdir):
+                makedirs(outdir)
+            out = cperr.output.decode("utf-8", 'ignore')
 
     # Remove the temporary directory
     shutil.rmtree(tmpdir)
 
     # Store all the output in a textfile inside the klee directory
-    with open(path.join(outdir, "output.txt"), 'w') as file:
-        file.write(out)
+    try:
+        with open(path.join(outdir, "output.txt"), 'w') as file:
+            file.write(out)
+    except FileNotFoundError as fnf:
+        Logger.log("The output.txt file or directory %s was not found\n\tDumping KLEE output here %s\n"%(outdir, out), verbosity_level="error")
 
     # Return a filled result container
-    return KleeResult(bcfile, analyzedfunc, outdir, out, flags)
+    return KleeResult(bcfile, analyzedfunc, outdir, out, flags, progress)
 
 
 def execute_klee_targeted_search(
         bcfile, analyzedfunc, targetfunc, outdir,
-        flags=None, posixflags=None, posix4main=None):
+        klee_timeout=None, flags=None, posixflags=None, posix4main=None, no_optimize=False):
     """
     Execute KLEE on a bitcode file with sonar search for targetfunc call
     """
@@ -230,4 +440,4 @@ def execute_klee_targeted_search(
     flags = [] if flags is None else flags
     flags = ["--search=sonar", "--sonar-target=function-call", "--sonar-target-info=" + targetfunc] + flags
     return execute_klee(
-        bcfile, analyzedfunc, outdir, flags, posixflags, posix4main)
+        bcfile, analyzedfunc, outdir, klee_timeout, False, flags, posixflags, posix4main, no_optimize)

@@ -4,10 +4,13 @@ Start a complete analysis with the MACKE toolchain on a given bitcode file
 import argparse
 import sys
 
+from datetime import datetime
+from os import path
+
 from .config import check_config
 from .cgroups import initialize_cgroups, validate_cgroups
 from .Macke import Macke
-
+from .Logger import Logger
 
 def str2bool(v):
     if v.lower() in ("yes", "true", "y", "t", "1"):
@@ -15,7 +18,6 @@ def str2bool(v):
     if v.lower() in ("no", "false", "n", "f", "0"):
         return False
     raise argparse.ArgumentTypeError("Expected boolean value.")
-
 
 def cgroups_command_check():
     """
@@ -99,7 +101,7 @@ def main():
         help="The output directory of the run is put inside this directory")
 
     parser.add_argument(
-        '--max-time',
+        '--max-klee-time',
         nargs='?',
         type=int,
         default=120,
@@ -107,7 +109,7 @@ def main():
     )
 
     parser.add_argument(
-        '--max-instruction-time',
+        '--max-klee-instruction-time',
         nargs='?',
         type=int,
         default=12,
@@ -137,17 +139,47 @@ def main():
     )
 
     parser.add_argument(
-        '--use-fuzzer',
+        '--flipper',
         type=str2bool,
         default=False,
         help="Toggle to use experimental fuzzing feature"
     )
 
     parser.add_argument(
-        '--fuzz-time',
+        '--flipper-fuzzer-first',
+        dest='flipper_fuzzer_first',
+        action='store_true',
+        default=False,
+        help="(experimental) Toggle to start the flipper mode with fuzzer first"
+    )
+    
+    parser.add_argument(
+        '--max-flipper-time',
+        type=int,
+        default=30,
+        help="Timeout (s) for the experimental flipper feature"
+    )
+
+    parser.add_argument(
+        '--log-flipping',
+        dest='log_flipping',
+        action='store_true',
+        help="Generate plot data in flipper mode"
+    )
+    parser.set_defaults(log_flipping=False)
+
+    parser.add_argument(
+        '--use-fuzzer',
+        type=str2bool,
+        default=False,
+        help="Toggle to use fuzzing feature"
+    )
+
+    parser.add_argument(
+        '--max-fuzz-time',
         type=int,
         default=10,
-        help="Time to fuzz a single function (in minutes)"
+        help="Time to fuzz a single function (in seconds)"
     )
 
     parser.add_argument(
@@ -207,20 +239,42 @@ def main():
         help="Ignore missing swap limitations"
     )
     parser.set_defaults(ignore_swap=False)
+    parser.add_argument(
+        '--no-optimize',
+        dest='no_optimize',
+        action='store_true',
+        help="Ask KLEE to not optimize during its runs. (E.g. For Coreutils)"
+    )
+    parser.set_defaults(no_optimize=False)
+
+    parser.add_argument(
+        '--verbosity-level',
+        type=str,
+        default="info",
+        help="The level of verbosity: none, info, warning, error, debug"
+    )
+    parser.add_argument(
+        '--log-file',
+        type=str,
+        help="Text file name, that will be used for logging, according to the verbosity level"
+    )
 
     check_config()
 
     args = parser.parse_args()
 
-
+    # Automatically set use_fuzzer in Flipper mode
+    if args.flipper and not args.use_fuzzer:
+            args.use_fuzzer = True
+    
     if args.use_fuzzer and not validate_cgroups(args.ignore_swap):
         print("CGroups are not initialized correctly, please run macke --initialize-cgroups --cgroups-usergroup=<user>:<group>")
         sys.exit(1)
 
     # Compose KLEE flags given directly by the user
     flags_user = [
-        "--max-time=%d" % args.max_time,
-        "--max-instruction-time=%d" % args.max_instruction_time
+        #"--max-time=%d" % args.max_klee_time,
+        "--max-instruction-time=%d" % args.max_klee_instruction_time
     ]
 
     # Compose flags for analysing the main function
@@ -237,13 +291,28 @@ def main():
     if args.sym_stdin:
         posixflags.append("-sym-stdin")
         posixflags.append(str(args.sym_stdin))
-
+    
+    if args.log_file:
+        Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
+    else:
+        starttime = datetime.now()
+        log_file = starttime.strftime("%Y-%m-%d-%H-%M-%S.log")
+        Logger.open(verbosity_level=args.verbosity_level, filename=path.join(args.parent_dir, log_file))
+    
     fuzzbc = args.fuzz_bc.name if args.fuzz_bc is not None else None
+
+    #Logger.open(verbosity_level=args.verbosity_level, filename=args.log_file)
 
     # And finally pass everything to MACKE
     macke = Macke(args.bcfile.name, args.comment, args.parent_dir,
-                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries, exclude_known_from_phase_two=args.exclude_known, use_fuzzer=args.use_fuzzer, fuzztime=args.fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done, generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen)
+                  args.quiet, flags_user, posixflags, posix4main, libraries=args.libraries,
+                  exclude_known_from_phase_two=args.exclude_known, max_klee_time=args.max_klee_time, use_flipper=args.flipper, max_flipper_time=args.max_flipper_time,
+                  use_fuzzer=args.use_fuzzer, max_fuzz_time=args.max_fuzz_time, stop_fuzz_when_done=args.stop_fuzz_when_done,
+                  generate_smart_fuzz_input=args.generate_smart_fuzz_input, fuzzbc=fuzzbc, fuzz_input_maxlen=args.fuzz_input_maxlen, no_optimize=args.no_optimize,
+                  flip_logging_desired=args.log_flipping, flipper_fuzzer_first=args.flipper_fuzzer_first)
     macke.run_complete_analysis()
+
+    Logger.close()
 
 if __name__ == "__main__":
     main()

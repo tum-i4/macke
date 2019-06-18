@@ -9,6 +9,7 @@ import os
 import subprocess
 import signal
 
+from .Logger import Logger
 
 try:
     from .config import VALGRIND
@@ -58,12 +59,12 @@ def parse_coverage(cov_file):
             id = int(name_str[1:bracket_end])
             if id in name_dict:
                 assert("(" + str(id) + ")\n" == name_str)
-                return name_dict[id]
+                #return name_dict[id]
             else:
                 assert("(" + str(id) + ")\n" != name_str)
                 name_str = name_str[bracket_end+1:].strip()
                 name_dict[id] = name_str
-                return name_str
+            return name_dict[id]
         else:
             return name_str
 
@@ -74,7 +75,11 @@ def parse_coverage(cov_file):
             pm = line[0:line.index('=')]
 
             if pm == "fl" or pm == "fi" or pm == "fe":
-                currentfile = parse_name(line[3:], fl_mapping)
+                try:
+                    currentfile = parse_name(line[3:], fl_mapping)
+                except AssertionError as ae:
+                    print("Could not parse name: %s"%(line[3:]))
+                    currentfile = ""
                 if currentfile != "" and currentfile != "???" and currentfile not in extract:
                     extract[currentfile] = {'covered': set(), 'uncovered': set()}
             elif pm == "cfl" or pm == "cfi":
@@ -82,7 +87,11 @@ def parse_coverage(cov_file):
             elif pm == "ob" or pm == "cob":
                 pass
             else:
-                parse_name(line[len(pm) + 1:], fn_mapping)
+                try:
+                    currentfile = parse_name(line[len(pm) + 1:], fn_mapping)
+                except AssertionError as ae:
+                    print("Could not parse name: %s"%(line[3:]))
+                    currentfile = ""
 
         # Start with number
         elif '0' <= line[0] <= '9':
@@ -92,6 +101,8 @@ def parse_coverage(cov_file):
             if loc != 0 and currentfile != "" and currentfile != "???":
                 assert int(cols[1]) != 0
                 # This line was covered
+                if not (currentfile in extract):
+                  extract[currentfile] = {'covered': set(), 'uncovered': set()}
                 extract[currentfile]['covered'].add(loc)
             currentline = loc
         # Subposition compression
@@ -102,6 +113,8 @@ def parse_coverage(cov_file):
             if loc != 0 and currentfile != "" and currentfile != "???":
                 assert int(cols[1]) != 0
                 # This line was covered
+                if not (currentfile in extract):
+                  extract[currentfile] = {'covered': set(), 'uncovered': set()}
                 extract[currentfile]['covered'].add(loc)
             currentline = loc
         # means cost on same line, thus nothing new is covered
@@ -115,21 +128,29 @@ def parse_coverage(cov_file):
         elif line.startswith("totals:"):
             pass
         else:
-            raise ValueError("Invalid line %s" % line)
+            print("Invalid line %s\nSkipping." % line)
+            pass
+            #raise ValueError("Invalid line %s" % line)
     return extract
 
 
 def get_coverage(args, inputfile, timeout=1, fileinput=False, tmpfilename=None):
-    if not tmpfilename==None:
+    if tmpfilename==None:
         fd, tmpfilename = tempfile.mkstemp(prefix="macke_callgrind_")
     else:
         fd = os.open(tmpfilename, "w")
     os.close(fd)
     if not fileinput:
-        infd = open(inputfile, "r")
+        try:
+            infd = open(inputfile, "r")
+        except FileNotFoundError:
+            Logger.log("get_coverage: input file " + inputfile + " not found!\n", verbosity_level="error")
+            return dict()
     else:
         infd = None
         args.append(inputfile)
+    Logger.log("get_coverage: " + str([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename]) +
+               str(args) + "\n", verbosity_level="debug")
     p = subprocess.Popen([ VALGRIND, "--tool=callgrind", "--callgrind-out-file=" + tmpfilename] + args, stdin=infd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
     output = b""
     err = b""

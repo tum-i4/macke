@@ -23,6 +23,7 @@ from .callgrind import get_coverage
 
 from .cgroups import cgroups_run_timed_subprocess, cgroups_run_checked_silent_subprocess, cgroups_Popen
 
+from .Logger import Logger
 
 def _dir_contains_no_files(dirname):
     return not any(path.isfile(f) for f in listdir(dirname))
@@ -33,7 +34,8 @@ def _run_checked_silent_subprocess(command, **kwargs):
         return p
     except subprocess.CalledProcessError as pexc:
         print("Error code %d: %s"%(pexc.returncode, pexc.output.decode('utf-8')))
-        sys.exit(pexc.returncode)
+        return None
+        #sys.exit(pexc.returncode)
 
 def _run_subprocess(*args, **kwargs):
     """
@@ -101,7 +103,7 @@ def extract_fuzzer_coverage(macke_directory):
         for d in inputdirectories:
             for f in listdir(d):
                 # Only look at afl inputs
-                if not f.startswith("id:"):
+                if "id:" not in f:
                     continue
                 inputfilename = path.join(d, f)
                 # When we miss permissions for file, add permissions
@@ -136,13 +138,64 @@ def extract_fuzzer_coverage(macke_directory):
     return coverage
 
 
+def get_files_from_dir(dir: str):
+    files = []
 
+    if not os.path.exists(dir):
+        Logger.log("get_files_from_dir: " + dir + " does not exits! Defaulting return value to [].\n",
+                   verbosity_level="warning")
+        return []
+
+    for f in listdir(dir):
+        if f.endswith(".ktest"):
+            Logger.log("compute_fuzz_process: added " + f + "\n", verbosity_level="debug")
+            files.append(f)
+        else:
+            if f.startswith("id:"):
+                if (path.join(dir, f) in files) or (path.join(dir, "min_" + f) in files):
+                    # skip
+                    #Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
+                    #           verbosity_level="debug")
+                    continue
+                else:
+                    files.append(path.join(dir, f))
+            elif f.startswith("min_id:"):
+                if path.join(dir, f) in files:
+                    #Logger.log("get_files_from_dir: skipping " + f + " because it is already in the list\n",
+                    #           verbosity_level="debug")
+                    continue  # skip it
+                elif path.join(dir, f[3:]) in files:
+                    #Logger.log("get_files_from_dir: removing " + f[3:] + " because " + f + " is already in the list\n",
+                    #           verbosity_level="debug")
+                    files.remove(path.join(dir, f[3:]))
+                files.append(path.join(dir, f))
+    return files
+
+def compute_fuzz_progress(outdir: str):
+
+    if not os.path.exists(outdir):
+        Logger.log("compute_fuzz_progress: " + outdir + " does not exits! Defaulting progress to 0.",
+                   verbosity_level="warning")
+        return 0
+
+    inputcorpus = path.join(outdir, "queue")
+    crashcorpus = path.join(outdir, "crashes")
+    hangcorpus = path.join(outdir, "hangs")
+
+    inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
+
+    progress = 0
+    for d in inputdirectories:
+        progress += len(get_files_from_dir(d))
+
+    #Logger.log("compute_fuzz_progress on " + outdir + ": " + str(progress) + "\n", verbosity_level="debug")
+    return progress
 
 class FuzzResult:
     """
     Container, that stores all information about a afl fuzzing run
     """
-    def __init__(self, fuzzmanager, cgroup, functionname, errordir, outdir):
+    def __init__(self, fuzzmanager, cgroup, functionname, errordir, outdir, old_progress):
         self.fuzzmanager = fuzzmanager
         self.cgroup = cgroup
 
@@ -151,13 +204,111 @@ class FuzzResult:
         self.outdir = errordir
         self.fuzzoutdir = outdir
 
-        inputcorpus = path.join(outdir, "queue")
-        crashcorpus = path.join(outdir, "crashes")
+        #inputcorpus = path.join(outdir, "queue")
+        #crashcorpus = path.join(outdir, "crashes")
 
-        self.find_errors(inputcorpus, crashcorpus)
+        new_progress = compute_fuzz_progress(outdir)
+        self.testcount = new_progress
+
+        if new_progress >= old_progress:
+            self.progress = new_progress - old_progress
+        else:
+            Logger.log("FuzzResult: new_progress (" + str(new_progress) + ") < than old_progress (" +
+                       str(old_progress) + ")\n", verbosity_level="warning")
+            self.progress = 0
+
+        self.convert_erros_to_klee_files(["queue", "crashes"])
+        #self.find_errors(inputcorpus, crashcorpus)
 
 
-    def find_errors(self, inputcorpus, crashcorpus):
+    def convert_to_klee_files(self, fuzzmanager, kleeargs = None):
+        Logger.log("convert_to_klee_files: processing " + self.outdir + "\n", verbosity_level="debug")
+
+        inputcorpus = path.join(self.fuzzoutdir, "queue")
+        crashcorpus = path.join(self.fuzzoutdir, "crashes")
+        hangcorpus = path.join(self.fuzzoutdir, "hangs")
+
+        
+        self.errorlist = []
+        asanerrorlist = []
+
+        # again duck typing names
+        self.errfiles = []
+        self.testcount = 0
+        self.errorcount = 0
+        
+        inputdirectories = [crashcorpus, hangcorpus]
+
+        # Convert error and normal files separately to avoid getting stuck
+        for d in inputdirectories:
+            files = get_files_from_dir(d)
+            for f in files:
+                self.testcount += 1
+                """
+                Creates a file <testname>.ktest and <testname>.ktest.err in directory
+                Returns the name of the errfile
+                """
+                errname = "fuzzer%0.5d" % self.testcount
+                ktestname = path.join(self.outdir, errname + ".ktest")
+
+                if os.path.exists(ktestname):
+                    continue
+
+                if kleeargs is None:
+                    kleeargs = []
+
+                reproduced = self.fuzzmanager.execute_reproducer(self.cgroup, f, self.analyzedfunc)
+                # If an error was reproduced then it will be converted later
+                if reproduced.iserror and reproduced.has_stack_trace():
+                    error = self.fuzzmanager.minimize_crash(self.cgroup, f, reproduced, self.analyzedfunc)
+                    self.errorcount += 1
+                    self.errfiles.append(f)
+                    asanerrorlist.append(error)
+                else:
+                    # Generate .ktest file
+                    fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+        
+        inputdirectories = [inputcorpus]
+        for d in inputdirectories:
+            files = get_files_from_dir(d)
+            for f in files:
+                if self.testcount>=500: # Force stop conversion from getting stuck
+                    Logger.log("convert_to_klee_files: Too many files to convert for %s. Forcing to stop.\n"%(self.analyzedfunc), verbosity_level="debug")
+                    break
+                self.testcount += 1
+                """
+                Creates a file <testname>.ktest and <testname>.ktest.err in directory
+                Returns the name of the errfile
+                """
+                errname = "fuzzer%0.5d" % self.testcount
+                ktestname = path.join(self.outdir, errname + ".ktest")
+
+                if os.path.exists(ktestname):
+                    continue
+
+                if kleeargs is None:
+                    kleeargs = []
+
+                reproduced = self.fuzzmanager.execute_reproducer(self.cgroup, f, self.analyzedfunc)
+                # If an error was reproduced then it will be converted later
+                if reproduced.iserror and reproduced.has_stack_trace():
+                    error = self.fuzzmanager.minimize_crash(self.cgroup, f, reproduced, self.analyzedfunc)
+                    self.errorcount += 1
+                    self.errfiles.append(f)
+                    asanerrorlist.append(error)
+                else:
+                    # Generate .ktest file
+                    fuzzmanager.run_ktest_converter(self.analyzedfunc, f, ktestname, kleeargs)
+        
+        # Convert AsanErrors to ktests (and ktest.errs)
+        for i in range(0, len(asanerrorlist)):
+            self.testcount += 1
+            errname = "fuzzer%0.5d" % self.testcount
+            Logger.log("convert_to_klee_files: Converting AsanError to test - %s.ktest.\n"%(errname), verbosity_level="debug")
+            errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
+            self.errorlist.append(Error(errfile, self.analyzedfunc))
+
+    def convert_erros_to_klee_files(self, inputdirectories):  #inputcorpus, crashcorpus):
         """
         Calls reproducer on all inputs and calculates statistics
         """
@@ -170,18 +321,25 @@ class FuzzResult:
         self.testcount = 0
         self.errorcount = 0
 
-        inputdirectories = [inputcorpus, crashcorpus]
-
-        if any(not path.exists(d) for d in inputdirectories):
-            self.fuzzmanager.print_func("Couldn't fuzz: " + self.analyzedfunc)
-            return
+        #inputdirectories = [inputcorpus, crashcorpus]
+        dir_paths = []
 
         for d in inputdirectories:
-            for f in listdir(d):
-                if not f.startswith("id:"):
-                    continue
-                fname = path.join(d, f)
+            dir_path = path.join(self.fuzzoutdir, d)
+            if not path.exists(dir_path):
+                Logger.log("Couldn't fuzz: " + self.analyzedfunc + " (" + d + ") does not exist!\n",
+                           verbosity_level="warning")
+                return
+            dir_paths.append(dir_path)
 
+        if path.exists(self.outdir):
+            os.system("rm -f " + self.outdir + "/*") # remove the content that was there
+        else:
+            Logger.log("convert_erros_to_klee_files: " + self.outdir + " does not exist!\n", verbosity_level="warning")
+
+        for d in dir_paths:
+            files = get_files_from_dir(d)
+            for fname in files:
                 # When we miss permissions for file, add permissions
                 if not os.access(fname, os.R_OK):
                     os.chmod(fname, stat.S_IRUSR)
@@ -202,8 +360,6 @@ class FuzzResult:
             errfile = asanerrorlist[i].convert_to_ktest(self.fuzzmanager, self.outdir, errname)
             self.errorlist.append(Error(errfile, self.analyzedfunc))
 
-
-
     def get_outname(self):
         """ Get the directory name of the fuzzer output directory """
         return path.basename(self.fuzzoutdir)
@@ -217,7 +373,8 @@ class FuzzManager:
     """
     Manages relevant global resources for fuzzing and
     """
-    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True, input_maxlen=32, print_func=print):
+    def __init__(self, bcfile, fuzzdir, builddir, lflags = None, cflags = None, stop_when_done=False, smart_input=True,
+                 input_maxlen=32, print_func=print):
         """
         Compile necessary binaries and save the names to them
         """
@@ -270,6 +427,8 @@ class FuzzManager:
         ## Instrument the bcfile
         # Add drivers
         self.print_func("Instrument bc file with fuzzer drivers...")
+        Logger.log(LLVMFUZZOPT + " -load " + LIBMACKEFUZZOPT + " -insert-fuzzdriver" +
+            " -renamemain" + " -mem2reg " + bcfile + " -o " + target_with_drivers)
         _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-insert-fuzzdriver",
             "-renamemain", "-mem2reg", bcfile, "-o", target_with_drivers])
@@ -296,9 +455,11 @@ class FuzzManager:
         self.minimizer = path.join(builddir, "afl_minimizer")
         _run_checked_silent_subprocess([AFLCC, "-O3"] + self.lflags + ["-o", self.minimizer, buffer_extract_afl_instrumented, initializer_afl_instrumented, target_with_drivers], env=asan_env)
 
-
         self.init_inputdirs()
 
+        # saturation computation
+        self.already_processed_lines = 1
+        self.saturation_index = 0
 
 
     def init_inputdirs(self):
@@ -344,21 +505,175 @@ class FuzzManager:
         infd.close()
         return ret
 
-    def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime):
-        errordir = path.join(outdir, "macke_errors")
-        # This creates outdir + error dir
-        makedirs(errordir)
+    # Function to check for saturation of AFL
+    def afl_saturated(self, outdir: str):
+        if not os.path.exists(os.path.join(os.path.join(outdir, "plot_data"))):
+            Logger.log("afl_saturated - " + outdir + "/plot_data does not exist (yet)\n", verbosity_level="debug")
+            return False
+
+        # saturated means:
+        # 3x timestamps with no pending totals and no pending favs
+        # detected cycles count as 2x such timestamps
+
+        saturated = False
+
+        with open(os.path.join(os.path.join(outdir, "plot_data")), "r") as plot_data:
+            lines = plot_data.readlines()
+
+            if len(lines) <= 1:
+                # the first line is always the header
+                # nothing to analyze yet
+                return False
+
+            number_of_interesting_lines = len(lines) - self.already_processed_lines
+            Logger.log("interesting lines " + str(number_of_interesting_lines) + "/" + str(len(lines)) + "\n", verbosity_level="debug")
+            self.already_processed_lines = number_of_interesting_lines
+
+            # one line is of form:
+            # unix_time, cycles_done, cur_path, paths_total,
+            # pending_total, pending_favs, map_size (float %),
+            # unique_crashes, unique_hangs, max_depth, execs_per_sec (float)
+            for line in lines[len(lines) - number_of_interesting_lines:]:
+                numbers = line.split(", ")
+
+                Logger.log("checking for saturation in line " + str(numbers) + "\n", verbosity_level="debug")
+                # we are interested in cycles_done ([1]), pending_totals ([4]) and pendings_favs ([5])
+                cycles = int(numbers[1])
+                pending_totals = int(numbers[4])
+                pending_favs = int(numbers[5])
+
+                Logger.log("cycles: " + str(cycles) + " pending_totals: " + str(pending_totals) +
+                           " pending_favs: " + str(pending_favs) + "\n", verbosity_level="debug")
+
+                if not (pending_favs or pending_totals): # no inputs to check right away
+                    if cycles:
+                        # cycles done: converge fast
+                        self.saturation_index += 2
+                    else:
+                        # no cycles done, slowly converge
+                        self.saturation_index += 1
+                # else: don't converge at all, since there are inputs to try
+
+                Logger.log("saturation index is " + str(self.saturation_index) + "\n", verbosity_level="debug")
+
+                if self.saturation_index > 2:
+                    # the saturation index has converged
+                    saturated = True
+                    break
+
+        return saturated
+
+    def wait_for_stopping_conditions(self, fuzztime, outdir: str, flipper_mode: bool, resume: bool, plot_data_logger,
+                                     funcname: str):
+        # Depending on flipper, either time.sleep or time.sleep till afl_saturates
+
+        Logger.log("waiting for stopping conditions for outdir " +
+                   outdir + " and fuzztime " + str(fuzztime) + "\n", verbosity_level="debug")
+
+        if flipper_mode:
+            Logger.log("Flipper mode: wait for saturation or timeout\n", verbosity_level="debug")
+
+        if plot_data_logger:
+            processed_files = []
+            inputcorpus = path.join(outdir, "queue")
+            crashcorpus = path.join(outdir, "crashes")
+            hangcorpus = path.join(outdir, "hangs")
+
+            inputdirectories = [inputcorpus, crashcorpus, hangcorpus]
+            args = [self.afltarget, "--fuzz-driver=" + funcname]
+
+
+        SATURATION_CHECK_PERIOD = 6  # default afl PLOT_UPDATE_SEC value
+        for i in range(0, int(fuzztime / SATURATION_CHECK_PERIOD)):
+            time.sleep(SATURATION_CHECK_PERIOD)
+            if plot_data_logger:
+                for d in inputdirectories:
+                    current_files = get_files_from_dir(d)
+                    for file in current_files:
+                        if not (file in processed_files): # TODO: adapt this to not do linear search in list
+                            #Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                            covered = get_coverage(args, file)
+                            plot_data_logger.log_fuzzer_progress(covered)
+                            processed_files.append(file)
+                        #else:
+                        #    Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+            if flipper_mode and self.afl_saturated(outdir): # only check saturation when in flipper_mode
+                Logger.log("saturation detected\n", verbosity_level="debug")
+                break
+        # sleep remaining time (if any)
+        time.sleep(fuzztime % SATURATION_CHECK_PERIOD)
+        if plot_data_logger:
+            for d in inputdirectories:
+                current_files = get_files_from_dir(d)
+                for file in current_files:
+                    if not (file in processed_files):  # TODO: adapt this to not do linear search in list
+                        #Logger.log("Calling get_coverage on " + str(file) + "\n", verbosity_level="debug")
+                        covered = get_coverage(args, file)
+                        plot_data_logger.log_fuzzer_progress(covered)
+                        processed_files.append(file)
+                    #else:
+                    #    Logger.log("File " + str(file) + " already processed\n", verbosity_level="debug")
+
+        if flipper_mode:
+            # saturation reached
+            if not resume or not os.path.exists(os.path.join(outdir, "plot_data")):
+                self.already_processed_lines = 1  # first line is text, so not interesting -> initial value 1
+            else:
+                with open(os.path.join(os.path.join(outdir, "plot_data")), "r") as plot_data:
+                    lines = plot_data.readlines()
+                    self.already_processed_lines = len(lines)
+                    Logger.log("resuming fuzzer with already_processed_lines = " + str(self.already_processed_lines)
+                               + "\n", verbosity_level="debug")
+            self.saturation_index = 0
+
+    def execute_afl_fuzz(self, cgroup, functionname, outdir, fuzztime, flipper_mode: bool, afl_to_klee_dir: str,
+                         plot_data_logger=None):
+        resume = False
+        # This creates outdir + error dir, if not already existing
+        if not os.path.exists(afl_to_klee_dir):
+            makedirs(afl_to_klee_dir)
+            old_progress = 0
+        else:
+            Logger.log(afl_to_klee_dir + " already exists. Flipper iteration?\n", verbosity_level="debug")
+            old_progress = compute_fuzz_progress(outdir)
+            Logger.log("old_progress: " + str(old_progress) + "\n", verbosity_level="debug")
+            resume_path = os.path.join(outdir, "_resume")
+            if os.path.exists(resume_path) and (len(listdir(resume_path)) > 0):
+                resume = True
+            else:
+                Logger.log("Not resuming because " + outdir + "/_resume is empty!\n", verbosity_level="warning")
+
 
         outfd = open(path.join(outdir, "output.txt"), "w")
-        proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none", self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd, stderr=outfd)
 
-        time.sleep(fuzztime)
+        if resume:
+            proc = cgroups_Popen([AFLFUZZ, "-i-", "-o", outdir, "-m", "none",
+                                  self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd,
+                                 stderr=outfd)
+            Logger.log("fuzzing command " + AFLFUZZ + " -i- -o " + outdir + " -m " + " none " +
+                              self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
+        else:
+            proc = cgroups_Popen([AFLFUZZ, "-i", self.inputforfunc[functionname], "-o", outdir, "-m", "none",
+                                  self.afltarget, "--fuzz-driver=" + functionname], cgroup=cgroup, stdout=outfd,
+                                 stderr=outfd)
+            Logger.log("fuzzing command " + AFLFUZZ + " -i " + self.inputforfunc[functionname] + " -o " + outdir + " -m " + " none " +
+                              self.afltarget + " --fuzz-driver=" + functionname + "\n", verbosity_level="debug")
+
+
+        Logger.log("fuzzing " + functionname + "\n", verbosity_level="debug")
+        Logger.log("outdir " + outdir + "\n", verbosity_level="debug")
+
+        # Run saturation check
+        self.wait_for_stopping_conditions(fuzztime, outdir, flipper_mode, resume, plot_data_logger, functionname)
+        Logger.log("AFL saturated\n", verbosity_level="debug")
+
         try:
             kill(proc.pid, signal.SIGINT)
             # wait for afl-fuzz to cleanup
-            proc.wait();
-        except OSError:
-            pass
+            proc.wait()
+            Logger.log("AFL killed!\n", verbosity_level="debug")
+        except Exception:
+            Logger.log("Error killing AFL (1)", verbosity_level="error")
         outfd.close()
 
         # afl-fuzz sometimes does not cleanup the target correctly, do it here
@@ -368,12 +683,12 @@ class FuzzManager:
             for pid in pids:
                 try:
                     kill(int(pid), signal.SIGKILL)
-                except OSError:
-                    pass
+                except Exception:
+                    Logger.log("Error killing AFL (2)", verbosity_level="error")
         except subprocess.CalledProcessError as ex:
             pass
 
-        return FuzzResult(self, cgroup, functionname, errordir, outdir);
+        return FuzzResult(self, cgroup, functionname, afl_to_klee_dir, outdir, old_progress)
 
 
     def execute_afl_tmin(self, cgroup, inputfile, outputfile, functionname):
@@ -405,7 +720,9 @@ class FuzzManager:
             kleeargflags.append("-kleeargs")
             kleeargflags.append(kleearg)
 
+        Logger.log("run_ktest_converter: creating " + outfile + " from " + inputfile + "\n",
+                   verbosity_level="debug")
 
         out = _run_checked_silent_subprocess([
             LLVMFUZZOPT, "-load", LIBMACKEFUZZOPT, "-generate-ktest", "-ktestfunction=" + function,
-            "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile]);
+            "-ktestinputfile=" + inputfile] + kleeargflags + ["-ktestout=" + outfile, "-disable-output", self.orig_bcfile])

@@ -13,7 +13,7 @@ KLEEFLAGS = [
     # "--output-module",  # Helpful for debugging
     "--output-source=false",  # Removing this is helpful for debugging
     "--posix-runtime",
-    "--watchdog"
+    #"--watchdog"
 ]
 
 UCLIBC_LIBS = [
