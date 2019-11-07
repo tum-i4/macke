@@ -96,12 +96,10 @@ def cgroups_run_subprocess(command, *args, cgroup=None, **kwargs):
         raise ValueError("No cgroup given")
     return subprocess.check_output(["cgexec", "-g", "memory:" + cgroup, "--sticky" ] + command, *args, **kwargs, stderr=subprocess.STDOUT)
 
-
 def cgroups_Popen(command, *args, cgroup=None, **kwargs):
     if cgroup is None:
         raise ValueError("No cgroup given")
     return subprocess.Popen(["cgexec", "-g", "memory:" + cgroup, "--sticky" ] + command, *args, **kwargs)
-
 
 def cgroups_run_timed_subprocess(command, *args, cgroup=None, timeout=1, **kwargs):
     """
