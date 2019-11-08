@@ -1,4 +1,4 @@
-
+# noinspection SpellCheckingInspection
 """
 Module to contain cgroup abstractions
 """
@@ -11,7 +11,8 @@ import signal
 
 from .config import FUZZMEMLIMIT, THREADNUM
 
-_limitfilenames = [ "memory.limit_in_bytes", "memory.memsw.limit_in_bytes" ]
+_limitfilenames = ["memory.limit_in_bytes", "memory.memsw.limit_in_bytes"]
+
 
 def get_num_threads():
     # Same behaviour as the multiprocessing.Pool for THREADNUM
@@ -41,19 +42,23 @@ def initialize_cgroups(usergroup, ignore_swap):
     files = _limitfilenames
 
     for cgrpname in get_cgroups():
-        subprocess.check_call(["cgcreate", "-s", "775", "-d", "775", "-f", "775", "-a", usergroup, "-t", usergroup, "-g", "memory:" + cgrpname])
+        subprocess.check_call(
+            ["cgcreate", "-s", "775", "-d", "775", "-f", "775", "-a", usergroup, "-t", usergroup, "-g",
+             "memory:" + cgrpname])
         cpath = path.join("/sys/fs/cgroup/memory", cgrpname)
         for p in _limitfilenames:
             fpath = path.join(cpath, p)
             if not path.exists(fpath) and path.basename(fpath) == "memory.memsw.limit_in_bytes":
                 if not ignore_swap:
-                    print("Your system does not allow limiting swap memory with cgroups. Either disable swap or continue at your own risk with by adding --ignore-swap to initialization and execution")
+                    print(
+                        "Your system does not allow limiting swap memory with cgroups. Either disable swap or continue at your own risk with by adding --ignore-swap to initialization and execution")
                     return False
                 else:
                     continue
             with open(fpath, 'w') as f:
                 f.write(limitstr)
     return True
+
 
 def validate_cgroups(ignore_swap):
     """
@@ -76,7 +81,9 @@ def validate_cgroups(ignore_swap):
             fpath = path.join(cpath, p)
             if not path.exists(fpath) and path.basename(fpath) == "memory.memsw.limit_in_bytes":
                 if not ignore_swap:
-                    print("Your system does not allow limiting swap memory with cgroups. Either disable swap or continue at your own risk with by adding --ignore-swap to initialization and execution")
+                    print(
+                        "Your system does not allow limiting swap memory with cgroups. Either disable swap or continue "
+                        "at your own risk with by adding --ignore-swap to initialization and execution")
                     return False
                 else:
                     continue
@@ -89,17 +96,22 @@ def validate_cgroups(ignore_swap):
 
 
 def cgroups_run_checked_silent_subprocess(args, cgroup, **kwargs):
-    return subprocess.check_output(["cgexec", "-g", "memory:" + cgroup, "--sticky" ] + args, stderr=subprocess.STDOUT, **kwargs)
+    return subprocess.check_output(["cgexec", "-g", "memory:" + cgroup, "--sticky"] + args, stderr=subprocess.STDOUT,
+                                   **kwargs)
+
 
 def cgroups_run_subprocess(command, *args, cgroup=None, **kwargs):
     if cgroup is None:
         raise ValueError("No cgroup given")
-    return subprocess.check_output(["cgexec", "-g", "memory:" + cgroup, "--sticky" ] + command, *args, **kwargs, stderr=subprocess.STDOUT)
+    return subprocess.check_output(["cgexec", "-g", "memory:" + cgroup, "--sticky"] + command, stderr=subprocess.STDOUT,
+                                   *args, **kwargs)
+
 
 def cgroups_Popen(command, *args, cgroup=None, **kwargs):
     if cgroup is None:
         raise ValueError("No cgroup given")
-    return subprocess.Popen(["cgexec", "-g", "memory:" + cgroup, "--sticky" ] + command, *args, **kwargs)
+    return subprocess.Popen(["cgexec", "-g", "memory:" + cgroup, "--sticky"] + command, *args, **kwargs)
+
 
 def cgroups_run_timed_subprocess(command, *args, cgroup=None, timeout=1, **kwargs):
     """
@@ -107,7 +119,8 @@ def cgroups_run_timed_subprocess(command, *args, cgroup=None, timeout=1, **kwarg
     """
     if cgroup is None:
         raise ValueError("No cgroup given")
-    p = cgroups_Popen(command, *args, cgroup=cgroup, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setsid)
+    p = cgroups_Popen(command, *args, cgroup=cgroup, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setsid,
+                      **kwargs)
     output = b""
     err = b""
     try:

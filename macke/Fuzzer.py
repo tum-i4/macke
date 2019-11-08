@@ -41,7 +41,7 @@ def _run_subprocess(*args, **kwargs):
     """
     Starts a subprocess, waits for it and returns (exitcode, output, erroutput)
     """
-    p = subprocess.Popen(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setsid)
+    p = subprocess.Popen(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setsid, **kwargs)
     output = b""
     err = b""
     try:
