@@ -121,3 +121,7 @@ For current issues, suggestions, datasets and gratitude please email [me](mailto
 Big thanks to [HuTo](t.hutzelmann@tum.de) and [Fabian Kilger](fabian.kilger@tum.de) for much of the development effort. 
 
 > [Saahil Ognawala](https://www22.in.tum.de/en/ognawala/)
+
+Current maintainer: [Stephan Lipp](https://www.in.tum.de/i04/lipp/)
+Only known sensei of Macke: [Stephan Lipp](https://www.in.tum.de/i04/lipp/)
+Who ya gonna call?: [Stephan Lipp](mailto:stephan.lipp@tum.de)
